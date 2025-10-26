@@ -34,6 +34,25 @@ impl UCDWords {
     pub fn normalize_capitilization(&self, ucd: String) -> Option<&String> {
         self.capitilization.get(&ucd)
     }
+
+    pub fn check_ucd(&self, ucd: &str) -> bool {
+        let ucd_lower = ucd.to_lowercase();
+        let parts: Vec<&str> = ucd_lower.split(';').collect();
+
+        let valids: Vec<bool> = parts
+            .iter()
+            .enumerate()
+            .map(|(i, &part)| {
+                if i == 0 {
+                    self.is_primary(String::from(part))
+                } else {
+                    self.is_secondary(String::from(part))
+                }
+            })
+            .collect();
+
+        !valids.contains(&false)
+    }
 }
 
 fn load_ivoa_ucd_words() -> io::Result<IVOAUCDWords> {
@@ -73,7 +92,6 @@ pub fn read_ucd_words(words: IVOAUCDWords) -> UCDWords {
             primary.push(ucd.clone().to_lowercase())
         }
         if "QSEVC".contains(letter) {
-            println!("{}", ucd.clone());
             secondary.push(ucd.clone().to_lowercase())
         }
     }
@@ -147,5 +165,24 @@ mod tests {
                 .unwrap(),
             "em.IR.15-30um"
         );
+    }
+
+    #[test]
+    fn test_check_ucd() {
+        let valid_ucd = "arith;em.IR.8-15um";
+        let not_valid1 = "em.IR.8-15um";
+        let valid_case_insensitive = "arItH;EM.IR.8-15um";
+        let not_valid_order = "em.IR.8-15um;arith";
+        let not_valid_random = "arith;foobar";
+        let not_valid_random_2 = "foobar;em.IR.8-15um";
+
+        let words = load_ivoa_ucd_words().unwrap();
+        let ucds = read_ucd_words(words);
+        assert!(ucds.check_ucd(valid_ucd));
+        assert!(!ucds.check_ucd(not_valid1));
+        assert!(ucds.check_ucd(valid_case_insensitive));
+        assert!(!ucds.check_ucd(not_valid_order));
+        assert!(!ucds.check_ucd(not_valid_random));
+        assert!(!ucds.check_ucd(not_valid_random_2));
     }
 }
