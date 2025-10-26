@@ -3,6 +3,8 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::iter::zip;
 
+/// The structural representation of the current IVOA UCD standard including the qualifiying
+/// flags, the ucds themselves, and descriptions of those ucds.
 #[derive(Debug)]
 pub struct IVOAUCDWords {
     pub letters: Vec<char>,
@@ -10,6 +12,10 @@ pub struct IVOAUCDWords {
     pub descriptions: Vec<String>,
 }
 
+/// Structure to manage the list of UCD words.
+///
+/// Contains a list of `primary` base ucds, `secondary` base ucds. As well as a descriptions of
+/// each base ucd, and the standard capitilization.
 #[derive(Debug)]
 pub struct UCDWords {
     pub primary: Vec<String>,
@@ -19,22 +25,27 @@ pub struct UCDWords {
 }
 
 impl UCDWords {
+    /// Returns true if the ucd is a primary.
     pub fn is_primary(&self, ucd: String) -> bool {
         self.primary.contains(&ucd)
     }
 
+    /// Returns true if the ucd is secondary.
     pub fn is_secondary(&self, ucd: String) -> bool {
         self.secondary.contains(&ucd)
     }
 
+    /// Returns the description of the given (case insensitive) ucd string.
     pub fn get_description(&self, ucd: String) -> Option<&String> {
         self.descriptions.get(&ucd)
     }
 
+    /// Returns the standard capitilization of the given (case insensitive) ucd string.
     pub fn normalize_capitilization(&self, ucd: String) -> Option<&String> {
         self.capitilization.get(&ucd)
     }
 
+    /// Returns true is the ucd string is a valid ucd.
     pub fn check_ucd(&self, ucd: &str) -> bool {
         let ucd_lower = ucd.to_lowercase();
         let parts: Vec<&str> = ucd_lower.split(';').collect();
@@ -55,7 +66,8 @@ impl UCDWords {
     }
 }
 
-fn load_ivoa_ucd_words() -> io::Result<IVOAUCDWords> {
+/// Loads the list of ucd words.
+pub fn load_ivoa_ucd_words() -> io::Result<IVOAUCDWords> {
     let mut file = File::open("data/ucd_1p6.dat")?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
@@ -79,6 +91,23 @@ fn load_ivoa_ucd_words() -> io::Result<IVOAUCDWords> {
     })
 }
 
+/// Reads the read in UCD words that creates the UCDWords struct.
+///
+/// #Example
+/// ```
+/// use crate::astroxide::ucd_checker::{load_ivoa_ucd_words, read_ucd_words};
+///
+/// let words = load_ivoa_ucd_words().expect("File not found");
+/// let ucd_words = read_ucd_words(words);
+///
+/// let valid_string = "meta.id;meta.main";
+/// let also_valid_string = "pOs.EQ.Ra;mETa.maIN"; // case insensitive.
+/// let not_valid = "meta.main;arith"; // arith is a primary and meta.main is secondary.
+///
+/// assert!(ucd_words.check_ucd(valid_string));
+/// assert!(ucd_words.check_ucd(also_valid_string));
+/// assert!(!ucd_words.check_ucd(not_valid));
+/// ```
 pub fn read_ucd_words(words: IVOAUCDWords) -> UCDWords {
     let mut primary: Vec<String> = Vec::new();
     let mut secondary: Vec<String> = Vec::new();
