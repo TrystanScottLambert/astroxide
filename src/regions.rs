@@ -32,6 +32,14 @@ impl SphericalAperture {
             PointLocation::OnBoundary
         }
     }
+
+    pub fn new(ra_center: f64, dec_center: f64, radius_degrees: f64) -> Self {
+        SphericalAperture {
+            ra_center,
+            dec_center,
+            radius_degrees,
+        }
+    }
 }
 
 pub struct SphericalAnulus {
@@ -44,16 +52,25 @@ pub struct SphericalAnulus {
 impl SphericalAnulus {
     pub fn locate_point(&self, ra: f64, dec: f64) -> PointLocation {
         let sep = angular_separation(&self.ra_center, &self.dec_center, &ra, &dec);
-        if sep > self.outer_radius_deg {
+        if sep > self.outer_radius_deg || sep < self.inner_radius_deg {
             PointLocation::Outside
-        } else if sep < self.inner_radius_deg {
-            PointLocation::Outside
-        } else if sep == self.outer_radius_deg {
-            PointLocation::OnBoundary
-        } else if sep == self.inner_radius_deg {
+        } else if sep == self.outer_radius_deg || sep == self.inner_radius_deg {
             PointLocation::OnBoundary
         } else {
             PointLocation::Inside
+        }
+    }
+    pub fn new(
+        ra_center: f64,
+        dec_center: f64,
+        inner_radius_deg: f64,
+        outer_radius_deg: f64,
+    ) -> Self {
+        SphericalAnulus {
+            ra_center,
+            dec_center,
+            inner_radius_deg,
+            outer_radius_deg,
         }
     }
 }
@@ -453,5 +470,24 @@ mod tests {
 
         assert_eq!(poly.locate_point(5.0, 5.0), PointLocation::Inside);
         assert_eq!(poly.locate_point(20.0, 20.0), PointLocation::Outside);
+    }
+
+    #[test]
+    fn test_aperture() {
+        let aperture = SphericalAperture::new(0., 0., 1.);
+        assert_eq!(aperture.locate_point(0.5, 0.5), PointLocation::Inside);
+        assert_eq!(aperture.locate_point(-0.5, -0.5), PointLocation::Inside);
+        assert_eq!(aperture.locate_point(-2., -0.5), PointLocation::Outside);
+        assert_eq!(aperture.locate_point(0., -1.), PointLocation::OnBoundary);
+    }
+
+    #[test]
+    fn test_anulus() {
+        let anulus = SphericalAnulus::new(0., 0., 1., 2.);
+        assert_eq!(anulus.locate_point(0.5, 0.5), PointLocation::Outside);
+        assert_eq!(anulus.locate_point(-0.5, -0.5), PointLocation::Outside);
+        assert_eq!(anulus.locate_point(-2., 0.), PointLocation::OnBoundary);
+        assert_eq!(anulus.locate_point(1.2, 0.), PointLocation::Inside);
+        assert_eq!(anulus.locate_point(2.2, 0.), PointLocation::Outside);
     }
 }
