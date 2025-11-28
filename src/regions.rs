@@ -1,5 +1,7 @@
 use std::f64::consts::PI;
 
+use crate::spherical_trig::angular_separation;
+
 const DEG_TO_RAD: f64 = PI / 180.0;
 
 /// Result of point location query
@@ -20,7 +22,40 @@ pub struct SphericalAperture {
 }
 
 impl SphericalAperture {
-    pub fn locate_point(&self, ra: f64, dec: f64) -> PointLocation {}
+    pub fn locate_point(&self, ra: f64, dec: f64) -> PointLocation {
+        let sep = angular_separation(&self.ra_center, &self.dec_center, &ra, &dec);
+        if sep < self.radius_degrees {
+            PointLocation::Inside
+        } else if sep > self.radius_degrees {
+            PointLocation::Outside
+        } else {
+            PointLocation::OnBoundary
+        }
+    }
+}
+
+pub struct SphericalAnulus {
+    ra_center: f64,
+    dec_center: f64,
+    inner_radius_deg: f64,
+    outer_radius_deg: f64,
+}
+
+impl SphericalAnulus {
+    pub fn locate_point(&self, ra: f64, dec: f64) -> PointLocation {
+        let sep = angular_separation(&self.ra_center, &self.dec_center, &ra, &dec);
+        if sep > self.outer_radius_deg {
+            PointLocation::Outside
+        } else if sep < self.inner_radius_deg {
+            PointLocation::Outside
+        } else if sep == self.outer_radius_deg {
+            PointLocation::OnBoundary
+        } else if sep == self.inner_radius_deg {
+            PointLocation::OnBoundary
+        } else {
+            PointLocation::Inside
+        }
+    }
 }
 
 /// Represents a spherical polygon boundary
