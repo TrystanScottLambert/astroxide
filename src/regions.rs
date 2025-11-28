@@ -13,6 +13,16 @@ pub enum PointLocation {
     Outside,
 }
 
+pub struct SphericalAperture {
+    ra_center: f64,
+    dec_center: f64,
+    radius_degrees: f64,
+}
+
+impl SphericalAperture {
+    pub fn locate_point(&self, ra: f64, dec: f64) -> PointLocation {}
+}
+
 /// Represents a spherical polygon boundary
 pub struct SphericalPolygon {
     /// Vertex latitudes (degrees)
@@ -166,6 +176,8 @@ impl SphericalPolygon {
         if max_distance_along_ray == 0.0 {
             furthest_point_lat = self.reference_lat;
             furthest_point_lon = self.reference_lon;
+            max_distance_along_ray =
+                spherical_distance(point_lat, point_lon, self.reference_lat, self.reference_lon);
         }
 
         // Count crossings of the arc from P to the furthest point with polygon edges
@@ -213,9 +225,9 @@ impl SphericalPolygon {
     }
 
     /// Fallback method for antipodal cases
-    fn locate_point_fallback(&self, _point_lat: f64, _point_lon: f64) -> PointLocation {
+    fn locate_point_fallback(&self, point_lat: f64, point_lon: f64) -> PointLocation {
         // Use a different reference point
-        let (_alt_ref_lat, _alt_ref_lon) = if self.vertex_latitudes.len() > 2 {
+        let (alt_ref_lat, alt_ref_lon) = if self.vertex_latitudes.len() > 2 {
             spherical_midpoint(
                 self.vertex_latitudes[1],
                 self.vertex_longitudes[1],
