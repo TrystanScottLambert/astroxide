@@ -1,6 +1,8 @@
 use std::f64::consts::PI;
 
-use crate::spherical_trig::angular_separation;
+use crate::spherical_trig::{
+    angular_separation, convert_cartesian_to_equitorial, convert_equitorial_to_cartesian,
+};
 
 const DEG_TO_RAD: f64 = PI / 180.0;
 
@@ -276,23 +278,35 @@ impl SphericalPolygon {
         }
     }
 
-    /// Fallback method for antipodal cases
-    fn locate_point_fallback(&self, point_lat: f64, point_lon: f64) -> PointLocation {
-        // Use a different reference point
-        let (alt_ref_lat, alt_ref_lon) = if self.vertex_latitudes.len() > 2 {
-            spherical_midpoint(
-                self.vertex_latitudes[1],
-                self.vertex_longitudes[1],
-                self.vertex_latitudes[2],
-                self.vertex_longitudes[2],
-            )
-        } else {
-            return PointLocation::Outside; // Shouldn't happen with valid polygon
-        };
+    pub fn center(&self) -> [f64; 2] {
+        let ras = &self.vertex_longitudes;
+        let decs = &self.vertex_latitudes;
 
-        // Simple check using this alternative reference
-        // (A full implementation would recursively call the main algorithm)
-        PointLocation::Outside
+        let n = ras.len() as f64;
+
+        // Convert to cartesian & sum
+        let (mut sx, mut sy, mut sz) = (0.0, 0.0, 0.0);
+
+        for (&ra, &dec) in ras.iter().zip(decs.iter()) {
+            let c = convert_equitorial_to_cartesian(&ra, &dec);
+            sx += c[0];
+            sy += c[1];
+            sz += c[2];
+        }
+
+        // Compute centroid vector
+        let mut cx = sx / n;
+        let mut cy = sy / n;
+        let mut cz = sz / n;
+
+        // Normalize back to unit sphere
+        let norm = (cx * cx + cy * cy + cz * cz).sqrt();
+        cx /= norm;
+        cy /= norm;
+        cz /= norm;
+
+        // Convert back to RA/Dec
+        convert_cartesian_to_equitorial(&cx, &cy, &cz)
     }
 }
 
