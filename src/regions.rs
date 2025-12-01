@@ -176,14 +176,6 @@ impl SphericalPolygon {
             return PointLocation::OnBoundary;
         }
 
-        // Check if P is antipodal to reference
-        if is_antipodal(point_lat, point_lon, self.reference_lat, self.reference_lon) {
-            // Antipodal case - use opposite direction
-            // For simplicity, we'll treat this as a degenerate case
-            // In practice, this is extremely rare
-            return self.locate_point_fallback(point_lat, point_lon);
-        }
-
         // Transform to P-centered coordinate system
         // In this system, the great circle through P and reference becomes a meridian
         let reference_lon_transformed =
@@ -307,6 +299,21 @@ impl SphericalPolygon {
 
         // Convert back to RA/Dec
         convert_cartesian_to_equitorial(&cx, &cy, &cz)
+    }
+
+    ///  smallest radii that encompasses the entire polygon.
+    pub fn smallest_radii(self) -> f64 {
+        let center = self.center();
+        let ras = &self.vertex_longitudes;
+        let decs = &self.vertex_latitudes;
+        let mut largest_angle = 0.0;
+        for (ra, dec) in ras.iter().zip(decs.iter()) {
+            let angle = angular_separation(&center[0], &center[1], ra, dec);
+            if angle > largest_angle {
+                largest_angle = angle
+            }
+        }
+        largest_angle
     }
 }
 
@@ -486,6 +493,17 @@ mod tests {
         assert_eq!(poly.locate_point(20.0, 20.0), PointLocation::Outside);
     }
 
+    #[test]
+    fn test_center_and_radii() {
+        let lats = vec![0.0, 10.0, 10.0, 0.0];
+        let lons = vec![0.0, 0.0, 10.0, 10.0];
+        let poly = SphericalPolygon::new(lats, lons).unwrap();
+        let center = poly.center();
+        let small_rad = poly.smallest_radii();
+        assert!((center[0] - 5.).abs() < 1e-1);
+        assert!((center[1] - 5.).abs() < 1e-1);
+        assert!((small_rad - 7.071).abs() < 1e-2);
+    }
     #[test]
     fn test_aperture() {
         let aperture = SphericalAperture::new(0., 0., 1.);
