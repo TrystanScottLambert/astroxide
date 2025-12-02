@@ -113,12 +113,12 @@ impl SphericalAnulus {
 /// Represents a spherical polygon boundary
 pub struct SphericalPolygon {
     /// Vertex latitudes (degrees)
-    vertex_latitudes: Vec<f64>,
+    dec_verticies: Vec<f64>,
     /// Vertex longitudes (degrees)
-    vertex_longitudes: Vec<f64>,
+    ra_verticies: Vec<f64>,
     /// Reference point (midpoint of an edge) for ray-casting
-    reference_lat: f64,
-    reference_lon: f64,
+    reference_dec: f64,
+    reference_ra: f64,
     /// Index of the reference edge
     reference_edge_index: usize,
 }
@@ -129,18 +129,16 @@ impl SphericalPolygon {
     /// Uses directional ray-casting - no interior point needed!
     ///
     /// # Arguments
-    /// * `vertex_latitudes` - Vector of vertex latitudes in degrees (positive north, negative south)
-    /// * `vertex_longitudes` - Vector of vertex longitudes in degrees (positive east, negative west)
+    /// * `dec_verticies` - Vector of vertex latitudes in degrees (positive north, negative south)
+    /// * `ra_verticies` - Vector of vertex longitudes in degrees (positive east, negative west)
     ///
     /// # Returns
     /// Result containing the SphericalPolygon or an error message
-    pub fn new(vertex_latitudes: Vec<f64>, vertex_longitudes: Vec<f64>) -> Result<Self, String> {
-        let num_vertices = vertex_latitudes.len();
+    pub fn new(ra_verticies: Vec<f64>, dec_verticies: Vec<f64>) -> Result<Self, String> {
+        let num_vertices = dec_verticies.len();
 
-        if num_vertices != vertex_longitudes.len() {
-            return Err(
-                "vertex_latitudes and vertex_longitudes must have the same length".to_string(),
-            );
+        if num_vertices != ra_verticies.len() {
+            return Err("dec_verticies and ra_verticies must have the same length".to_string());
         }
 
         if num_vertices < 3 {
@@ -152,8 +150,8 @@ impl SphericalPolygon {
             let prev_index = if i == 0 { num_vertices - 1 } else { i - 1 };
 
             // Check if vertices are distinct
-            if vertex_latitudes[i] == vertex_latitudes[prev_index]
-                && vertex_longitudes[i] == vertex_longitudes[prev_index]
+            if dec_verticies[i] == dec_verticies[prev_index]
+                && ra_verticies[i] == ra_verticies[prev_index]
             {
                 return Err(format!(
                     "Vertices {} and {} are not distinct",
@@ -163,28 +161,28 @@ impl SphericalPolygon {
 
             // Check if vertices are antipodal
             if are_vertices_antipodal(
-                vertex_latitudes[i],
-                vertex_longitudes[i],
-                vertex_latitudes[prev_index],
-                vertex_longitudes[prev_index],
+                dec_verticies[i],
+                ra_verticies[i],
+                dec_verticies[prev_index],
+                ra_verticies[prev_index],
             ) {
                 return Err(format!("Vertices {} and {} are antipodal", i, prev_index));
             }
         }
 
         // Pick first edge midpoint as reference (any edge works)
-        let (reference_lat, reference_lon) = spherical_midpoint(
-            vertex_latitudes[0],
-            vertex_longitudes[0],
-            vertex_latitudes[1],
-            vertex_longitudes[1],
+        let (reference_dec, reference_ra) = spherical_midpoint(
+            dec_verticies[0],
+            ra_verticies[0],
+            dec_verticies[1],
+            ra_verticies[1],
         );
 
         Ok(SphericalPolygon {
-            vertex_latitudes,
-            vertex_longitudes,
-            reference_lat,
-            reference_lon,
+            dec_verticies,
+            ra_verticies,
+            reference_dec,
+            reference_ra,
             reference_edge_index: 0,
         })
     }
@@ -205,75 +203,75 @@ impl SphericalPolygon {
     /// PointLocation indicating whether P is inside, outside, or on boundary
     pub fn locate_point(&self, point_ra: f64, point_dec: f64) -> PointLocation {
         // Check if P is on the reference point
-        if point_dec == self.reference_lat && point_ra == self.reference_lon {
+        if point_dec == self.reference_dec && point_ra == self.reference_ra {
             return PointLocation::OnBoundary;
         }
 
         // Transform to P-centered coordinate system
         // In this system, the great circle through P and reference becomes a meridian
-        let reference_lon_transformed =
-            transform_longitude(point_dec, point_ra, self.reference_lat, self.reference_lon);
+        let reference_ra_transformed =
+            transform_longitude(point_dec, point_ra, self.reference_dec, self.reference_ra);
 
         // Find the furthest vertex along the ray direction
-        // This is the vertex with transformed longitude closest to reference_lon_transformed
+        // This is the vertex with transformed longitude closest to reference_ra_transformed
         // (considering the directional nature - we want vertices "ahead" on the ray)
         let mut max_distance_along_ray = 0.0;
-        let mut furthest_point_dec = self.reference_lat;
-        let mut furthest_point_ra = self.reference_lon;
+        let mut furthest_point_dec = self.reference_dec;
+        let mut furthest_point_ra = self.reference_ra;
 
-        for i in 0..self.vertex_latitudes.len() {
+        for i in 0..self.dec_verticies.len() {
             let vertex_lon_transformed = transform_longitude(
                 point_dec,
                 point_ra,
-                self.vertex_latitudes[i],
-                self.vertex_longitudes[i],
+                self.dec_verticies[i],
+                self.ra_verticies[i],
             );
 
             // Check if this vertex is in the same hemisphere as the reference
             // (i.e., on the same side of the ray from P)
             let lon_diff_from_ref =
-                normalize_longitude_difference(vertex_lon_transformed - reference_lon_transformed);
+                normalize_longitude_difference(vertex_lon_transformed - reference_ra_transformed);
 
             // Only consider vertices in the forward direction (within ~90° of reference)
             if lon_diff_from_ref.abs() < 90.0 {
                 let dist = spherical_distance(
                     point_dec,
                     point_ra,
-                    self.vertex_latitudes[i],
-                    self.vertex_longitudes[i],
+                    self.dec_verticies[i],
+                    self.ra_verticies[i],
                 );
 
                 if dist > max_distance_along_ray {
                     max_distance_along_ray = dist;
-                    furthest_point_dec = self.vertex_latitudes[i];
-                    furthest_point_ra = self.vertex_longitudes[i];
+                    furthest_point_dec = self.dec_verticies[i];
+                    furthest_point_ra = self.ra_verticies[i];
                 }
             }
         }
 
         // If no vertex found in forward direction, use reference point
         if max_distance_along_ray == 0.0 {
-            furthest_point_dec = self.reference_lat;
-            furthest_point_ra = self.reference_lon;
+            furthest_point_dec = self.reference_dec;
+            furthest_point_ra = self.reference_ra;
             max_distance_along_ray =
-                spherical_distance(point_dec, point_ra, self.reference_lat, self.reference_lon);
+                spherical_distance(point_dec, point_ra, self.reference_dec, self.reference_ra);
         }
 
         // Count crossings of the arc from P to the furthest point with polygon edges
         let mut crossing_count = 0;
 
-        for i in 0..self.vertex_latitudes.len() {
+        for i in 0..self.dec_verticies.len() {
             // Skip the reference edge
             if i == self.reference_edge_index {
                 continue;
             }
 
-            let next_i = (i + 1) % self.vertex_latitudes.len();
+            let next_i = (i + 1) % self.dec_verticies.len();
 
-            let v1_lat = self.vertex_latitudes[i];
-            let v1_lon = self.vertex_longitudes[i];
-            let v2_lat = self.vertex_latitudes[next_i];
-            let v2_lon = self.vertex_longitudes[next_i];
+            let v1_lat = self.dec_verticies[i];
+            let v1_lon = self.ra_verticies[i];
+            let v2_lat = self.dec_verticies[next_i];
+            let v2_lon = self.ra_verticies[next_i];
 
             // Check if P is on this edge
             if is_point_on_arc(point_dec, point_ra, v1_lat, v1_lon, v2_lat, v2_lon) {
@@ -304,8 +302,8 @@ impl SphericalPolygon {
     }
 
     pub fn center(&self) -> [f64; 2] {
-        let ras = &self.vertex_longitudes;
-        let decs = &self.vertex_latitudes;
+        let ras = &self.ra_verticies;
+        let decs = &self.dec_verticies;
 
         let n = ras.len() as f64;
 
@@ -337,8 +335,8 @@ impl SphericalPolygon {
     ///  smallest radii that encompasses the entire polygon.
     pub fn smallest_radii(&self) -> f64 {
         let center = self.center();
-        let ras = &self.vertex_longitudes;
-        let decs = &self.vertex_latitudes;
+        let ras = &self.ra_verticies;
+        let decs = &self.dec_verticies;
         let mut largest_angle = 0.0;
         for (ra, dec) in ras.iter().zip(decs.iter()) {
             let angle = angular_separation(&center[0], &center[1], ra, dec);
