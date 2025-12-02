@@ -7,5 +7,6 @@ license = "MIT"
 
 
 [dependencies]
+kiddo = "5.2.2"
 libm = "0.2.15"
 phf = { version = "0.12.1", features = ["macros"] }
