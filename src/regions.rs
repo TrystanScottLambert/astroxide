@@ -1,7 +1,8 @@
 use std::f64::consts::PI;
 
 use crate::spherical_trig::{
-    angular_separation, convert_cartesian_to_equitorial, convert_equitorial_to_cartesian,
+    Point, angular_separation, build_kd_tree, convert_cartesian_to_equitorial,
+    convert_equitorial_to_cartesian, find_idx_within,
 };
 
 const DEG_TO_RAD: f64 = PI / 180.0;
@@ -42,6 +43,21 @@ impl SphericalAperture {
             radius_degrees,
         }
     }
+
+    pub fn locate_points(&self, ras: &Vec<f64>, decs: &Vec<f64>) -> Vec<PointLocation> {
+        let tree = build_kd_tree(ras, decs);
+        let point = Point {
+            ra_deg: self.ra_center,
+            dec_deg: self.dec_center,
+        };
+        let idx = find_idx_within(&tree, &point, self.radius_degrees);
+        let mut results = vec![PointLocation::Outside; ras.len()];
+        for id in idx {
+            results[id as usize] = PointLocation::Inside;
+        }
+        results
+        // TODO: include bounday coniditon?
+    }
 }
 
 pub struct SphericalAnulus {
@@ -74,6 +90,23 @@ impl SphericalAnulus {
             inner_radius_deg,
             outer_radius_deg,
         }
+    }
+    pub fn locate_points(&self, ras: &Vec<f64>, decs: &Vec<f64>) -> Vec<PointLocation> {
+        let tree = build_kd_tree(ras, decs);
+        let point = Point {
+            ra_deg: self.ra_center,
+            dec_deg: self.dec_center,
+        };
+        let idx_inner = find_idx_within(&tree, &point, self.inner_radius_deg);
+        let idx_outer = find_idx_within(&tree, &point, self.outer_radius_deg);
+        let mut results = vec![PointLocation::Outside; ras.len()];
+        for id in idx_outer {
+            results[id as usize] = PointLocation::Inside;
+        }
+        for id in idx_inner {
+            results[id as usize] = PointLocation::Outside;
+        }
+        results
     }
 }
 
@@ -165,33 +198,33 @@ impl SphericalPolygon {
     /// 4. Even crossings = inside, odd = outside
     ///
     /// # Arguments
-    /// * `point_lat` - Latitude of point P in degrees
-    /// * `point_lon` - Longitude of point P in degrees
+    /// * `point_dec` - Latitude of point P in degrees
+    /// * `point_ra` - Longitude of point P in degrees
     ///
     /// # Returns
     /// PointLocation indicating whether P is inside, outside, or on boundary
-    pub fn locate_point(&self, point_lat: f64, point_lon: f64) -> PointLocation {
+    pub fn locate_point(&self, point_ra: f64, point_dec: f64) -> PointLocation {
         // Check if P is on the reference point
-        if point_lat == self.reference_lat && point_lon == self.reference_lon {
+        if point_dec == self.reference_lat && point_ra == self.reference_lon {
             return PointLocation::OnBoundary;
         }
 
         // Transform to P-centered coordinate system
         // In this system, the great circle through P and reference becomes a meridian
         let reference_lon_transformed =
-            transform_longitude(point_lat, point_lon, self.reference_lat, self.reference_lon);
+            transform_longitude(point_dec, point_ra, self.reference_lat, self.reference_lon);
 
         // Find the furthest vertex along the ray direction
         // This is the vertex with transformed longitude closest to reference_lon_transformed
         // (considering the directional nature - we want vertices "ahead" on the ray)
         let mut max_distance_along_ray = 0.0;
-        let mut furthest_point_lat = self.reference_lat;
-        let mut furthest_point_lon = self.reference_lon;
+        let mut furthest_point_dec = self.reference_lat;
+        let mut furthest_point_ra = self.reference_lon;
 
         for i in 0..self.vertex_latitudes.len() {
             let vertex_lon_transformed = transform_longitude(
-                point_lat,
-                point_lon,
+                point_dec,
+                point_ra,
                 self.vertex_latitudes[i],
                 self.vertex_longitudes[i],
             );
@@ -204,26 +237,26 @@ impl SphericalPolygon {
             // Only consider vertices in the forward direction (within ~90° of reference)
             if lon_diff_from_ref.abs() < 90.0 {
                 let dist = spherical_distance(
-                    point_lat,
-                    point_lon,
+                    point_dec,
+                    point_ra,
                     self.vertex_latitudes[i],
                     self.vertex_longitudes[i],
                 );
 
                 if dist > max_distance_along_ray {
                     max_distance_along_ray = dist;
-                    furthest_point_lat = self.vertex_latitudes[i];
-                    furthest_point_lon = self.vertex_longitudes[i];
+                    furthest_point_dec = self.vertex_latitudes[i];
+                    furthest_point_ra = self.vertex_longitudes[i];
                 }
             }
         }
 
         // If no vertex found in forward direction, use reference point
         if max_distance_along_ray == 0.0 {
-            furthest_point_lat = self.reference_lat;
-            furthest_point_lon = self.reference_lon;
+            furthest_point_dec = self.reference_lat;
+            furthest_point_ra = self.reference_lon;
             max_distance_along_ray =
-                spherical_distance(point_lat, point_lon, self.reference_lat, self.reference_lon);
+                spherical_distance(point_dec, point_ra, self.reference_lat, self.reference_lon);
         }
 
         // Count crossings of the arc from P to the furthest point with polygon edges
@@ -243,16 +276,16 @@ impl SphericalPolygon {
             let v2_lon = self.vertex_longitudes[next_i];
 
             // Check if P is on this edge
-            if is_point_on_arc(point_lat, point_lon, v1_lat, v1_lon, v2_lat, v2_lon) {
+            if is_point_on_arc(point_dec, point_ra, v1_lat, v1_lon, v2_lat, v2_lon) {
                 return PointLocation::OnBoundary;
             }
 
             // Check if the arc from P to furthest point crosses this edge
             if arcs_intersect(
-                point_lat,
-                point_lon,
-                furthest_point_lat,
-                furthest_point_lon,
+                point_dec,
+                point_ra,
+                furthest_point_dec,
+                furthest_point_ra,
                 v1_lat,
                 v1_lon,
                 v2_lat,
@@ -302,7 +335,7 @@ impl SphericalPolygon {
     }
 
     ///  smallest radii that encompasses the entire polygon.
-    pub fn smallest_radii(self) -> f64 {
+    pub fn smallest_radii(&self) -> f64 {
         let center = self.center();
         let ras = &self.vertex_longitudes;
         let decs = &self.vertex_latitudes;
@@ -314,6 +347,22 @@ impl SphericalPolygon {
             }
         }
         largest_angle
+    }
+    pub fn locate_points(&self, ras: Vec<f64>, decs: Vec<f64>) -> Vec<PointLocation> {
+        let angular_distance = self.smallest_radii();
+        let center = self.center();
+        let center_point = Point {
+            ra_deg: center[0],
+            dec_deg: center[1],
+        };
+        let tree = build_kd_tree(&ras, &decs);
+        let idx = find_idx_within(&tree, &center_point, angular_distance);
+        let mut results = vec![PointLocation::Outside; ras.len()];
+        for id in idx {
+            let local_result = self.locate_point(decs[id as usize], ras[id as usize]);
+            results[id as usize] = local_result;
+        }
+        results
     }
 }
 
@@ -463,6 +512,8 @@ fn spherical_midpoint(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> (f64, f64) 
 
 #[cfg(test)]
 mod tests {
+    use std::iter::zip;
+
     use super::*;
 
     #[test]
@@ -507,6 +558,19 @@ mod tests {
     #[test]
     fn test_aperture() {
         let aperture = SphericalAperture::new(0., 0., 1.);
+        let ras = vec![0., 0., -0.1, 1., 2.];
+        let decs = vec![0., 0.5, -0.1, 0., 2.];
+        let results = aperture.locate_points(&ras, &decs);
+        let answers = vec![
+            PointLocation::Inside,
+            PointLocation::Inside,
+            PointLocation::Inside,
+            PointLocation::Inside,
+            PointLocation::Outside,
+        ];
+        for (r, a) in zip(results, answers) {
+            assert_eq!(r, a)
+        }
         assert_eq!(aperture.locate_point(0.5, 0.5), PointLocation::Inside);
         assert_eq!(aperture.locate_point(-0.5, -0.5), PointLocation::Inside);
         assert_eq!(aperture.locate_point(-2., -0.5), PointLocation::Outside);
@@ -516,6 +580,21 @@ mod tests {
     #[test]
     fn test_anulus() {
         let anulus = SphericalAnulus::new(0., 0., 1., 2.);
+        let ras = vec![0., 0., -0.1, 1., 2., 1.1, 2.];
+        let decs = vec![0., 0.5, -0.1, 0., 2., 1.1, 0.];
+        let results = anulus.locate_points(&ras, &decs);
+        let answers = vec![
+            PointLocation::Outside,
+            PointLocation::Outside,
+            PointLocation::Outside,
+            PointLocation::Outside,
+            PointLocation::Outside,
+            PointLocation::Inside,
+            PointLocation::Outside,
+        ];
+        for (r, a) in zip(results, answers) {
+            assert_eq!(r, a)
+        }
         assert_eq!(anulus.locate_point(0.5, 0.5), PointLocation::Outside);
         assert_eq!(anulus.locate_point(-0.5, -0.5), PointLocation::Outside);
         assert_eq!(anulus.locate_point(-2., 0.), PointLocation::OnBoundary);

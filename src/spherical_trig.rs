@@ -131,7 +131,7 @@ pub struct Point {
     pub dec_deg: f64,
 }
 
-pub fn build_kd_tree(ra_array_deg: Vec<f64>, dec_array_deg: Vec<f64>) -> ImmutableKdTree<f64, 3> {
+pub fn build_kd_tree(ra_array_deg: &Vec<f64>, dec_array_deg: &Vec<f64>) -> ImmutableKdTree<f64, 3> {
     let entries: Vec<[f64; 3]> = ra_array_deg
         .iter()
         .zip(dec_array_deg)
@@ -142,8 +142,8 @@ pub fn build_kd_tree(ra_array_deg: Vec<f64>, dec_array_deg: Vec<f64>) -> Immutab
 }
 
 pub fn find_idx_within(
-    tree: ImmutableKdTree<f64, 3>,
-    point: Point,
+    tree: &ImmutableKdTree<f64, 3>,
+    point: &Point,
     angular_difference_deg: f64,
 ) -> Vec<u64> {
     let point_cartesian = convert_equitorial_to_cartesian(&point.ra_deg, &point.dec_deg);
@@ -163,7 +163,7 @@ mod test {
     fn test_kd_tree_building() {
         let ras = vec![0., 23., 180.];
         let decs = vec![0., -10., 20.];
-        let tree = build_kd_tree(ras.clone(), decs.clone());
+        let tree = build_kd_tree(&ras, &decs);
 
         let test_point = convert_equitorial_to_cartesian(&ras[1], &decs[1]);
         let result = tree.within::<SquaredEuclidean>(&test_point, 1e-10);
@@ -174,12 +174,12 @@ mod test {
     fn test_finding_within() {
         let ras = vec![120., 120.9999, 120., 180.];
         let decs = vec![0., 0., 0., -45.];
-        let tree = build_kd_tree(ras, decs);
+        let tree = build_kd_tree(&ras, &decs);
         let point = Point {
             ra_deg: 120.,
             dec_deg: 0.,
         };
-        let mut result = find_idx_within(tree, point, 1.);
+        let mut result = find_idx_within(&tree, &point, 1.);
         assert_eq!(result.len(), 3);
         let answers = [0, 1, 2];
         result.sort();
