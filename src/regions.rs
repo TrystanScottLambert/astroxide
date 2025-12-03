@@ -112,400 +112,112 @@ impl SphericalAnulus {
 
 /// Represents a spherical polygon boundary
 pub struct SphericalPolygon {
-    /// Vertex latitudes (degrees)
-    dec_verticies: Vec<f64>,
-    /// Vertex longitudes (degrees)
     ra_verticies: Vec<f64>,
-    /// Reference point (midpoint of an edge) for ray-casting
-    reference_dec: f64,
-    reference_ra: f64,
-    /// Index of the reference edge
-    reference_edge_index: usize,
+    dec_verticies: Vec<f64>,
 }
 
 impl SphericalPolygon {
-    /// Create a new spherical polygon from vertices
-    ///
-    /// Uses directional ray-casting - no interior point needed!
-    ///
-    /// # Arguments
-    /// * `dec_verticies` - Vector of vertex latitudes in degrees (positive north, negative south)
-    /// * `ra_verticies` - Vector of vertex longitudes in degrees (positive east, negative west)
-    ///
-    /// # Returns
-    /// Result containing the SphericalPolygon or an error message
-    pub fn new(ra_verticies: Vec<f64>, dec_verticies: Vec<f64>) -> Result<Self, String> {
-        let num_vertices = dec_verticies.len();
-
-        if num_vertices != ra_verticies.len() {
-            return Err("dec_verticies and ra_verticies must have the same length".to_string());
-        }
-
-        if num_vertices < 3 {
-            return Err("Polygon must have at least 3 vertices".to_string());
-        }
-
-        // Validate vertices
-        for i in 0..num_vertices {
-            let prev_index = if i == 0 { num_vertices - 1 } else { i - 1 };
-
-            // Check if vertices are distinct
-            if dec_verticies[i] == dec_verticies[prev_index]
-                && ra_verticies[i] == ra_verticies[prev_index]
-            {
-                return Err(format!(
-                    "Vertices {} and {} are not distinct",
-                    i, prev_index
-                ));
-            }
-
-            // Check if vertices are antipodal
-            if are_vertices_antipodal(
-                dec_verticies[i],
-                ra_verticies[i],
-                dec_verticies[prev_index],
-                ra_verticies[prev_index],
-            ) {
-                return Err(format!("Vertices {} and {} are antipodal", i, prev_index));
-            }
-        }
-
-        // Pick first edge midpoint as reference (any edge works)
-        let (reference_dec, reference_ra) = spherical_midpoint(
-            dec_verticies[0],
-            ra_verticies[0],
-            dec_verticies[1],
-            ra_verticies[1],
-        );
-
-        Ok(SphericalPolygon {
-            dec_verticies,
+    pub fn new(ra_verticies: Vec<f64>, dec_verticies: Vec<f64>) -> Self {
+        SphericalPolygon {
             ra_verticies,
-            reference_dec,
-            reference_ra,
-            reference_edge_index: 0,
-        })
+            dec_verticies,
+        }
     }
-
-    /// Locate a point P relative to the spherical polygon boundary
+    /// Point-in-polygon using the **spherical winding number** algorithm.
     ///
-    /// Algorithm:
-    /// 1. Cast a ray from P through the reference point M (edge midpoint)
-    /// 2. Find the furthest vertex along this ray direction
-    /// 3. Count crossings of the arc from P to that furthest vertex
-    /// 4. Even crossings = inside, odd = outside
-    ///
-    /// # Arguments
-    /// * `point_dec` - Latitude of point P in degrees
-    /// * `point_ra` - Longitude of point P in degrees
-    ///
-    /// # Returns
-    /// PointLocation indicating whether P is inside, outside, or on boundary
+    /// Returns:
+    /// - Inside
+    /// - Outside
+    /// - OnBoundary (if exactly on an edge)
     pub fn locate_point(&self, point_ra: f64, point_dec: f64) -> PointLocation {
-        // Check if P is on the reference point
-        if point_dec == self.reference_dec && point_ra == self.reference_ra {
-            return PointLocation::OnBoundary;
+        // Convert P to a 3D unit vector
+        let p = convert_equitorial_to_cartesian(&point_ra, &point_dec);
+
+        // Build polygon as unit vectors
+        let n = self.ra_verticies.len();
+        let mut verts: Vec<[f64; 3]> = Vec::with_capacity(n);
+        for (&ra, &dec) in self.ra_verticies.iter().zip(self.dec_verticies.iter()) {
+            verts.push(convert_equitorial_to_cartesian(&ra, &dec));
         }
 
-        // Transform to P-centered coordinate system
-        // In this system, the great circle through P and reference becomes a meridian
-        let reference_ra_transformed =
-            transform_longitude(point_dec, point_ra, self.reference_dec, self.reference_ra);
+        // Compute total signed winding angle around P
+        let mut total_angle = 0.0;
 
-        // Find the furthest vertex along the ray direction
-        // This is the vertex with transformed longitude closest to reference_ra_transformed
-        // (considering the directional nature - we want vertices "ahead" on the ray)
-        let mut max_distance_along_ray = 0.0;
-        let mut furthest_point_dec = self.reference_dec;
-        let mut furthest_point_ra = self.reference_ra;
+        for i in 0..n {
+            let a = verts[i];
+            let b = verts[(i + 1) % n];
 
-        for i in 0..self.dec_verticies.len() {
-            let vertex_lon_transformed = transform_longitude(
-                point_dec,
-                point_ra,
-                self.dec_verticies[i],
-                self.ra_verticies[i],
-            );
-
-            // Check if this vertex is in the same hemisphere as the reference
-            // (i.e., on the same side of the ray from P)
-            let lon_diff_from_ref =
-                normalize_longitude_difference(vertex_lon_transformed - reference_ra_transformed);
-
-            // Only consider vertices in the forward direction (within ~90° of reference)
-            if lon_diff_from_ref.abs() < 90.0 {
-                let dist = spherical_distance(
-                    point_dec,
-                    point_ra,
-                    self.dec_verticies[i],
-                    self.ra_verticies[i],
-                );
-
-                if dist > max_distance_along_ray {
-                    max_distance_along_ray = dist;
-                    furthest_point_dec = self.dec_verticies[i];
-                    furthest_point_ra = self.ra_verticies[i];
-                }
-            }
-        }
-
-        // If no vertex found in forward direction, use reference point
-        if max_distance_along_ray == 0.0 {
-            furthest_point_dec = self.reference_dec;
-            furthest_point_ra = self.reference_ra;
-            max_distance_along_ray =
-                spherical_distance(point_dec, point_ra, self.reference_dec, self.reference_ra);
-        }
-
-        // Count crossings of the arc from P to the furthest point with polygon edges
-        let mut crossing_count = 0;
-
-        for i in 0..self.dec_verticies.len() {
-            // Skip the reference edge
-            if i == self.reference_edge_index {
-                continue;
-            }
-
-            let next_i = (i + 1) % self.dec_verticies.len();
-
-            let v1_lat = self.dec_verticies[i];
-            let v1_lon = self.ra_verticies[i];
-            let v2_lat = self.dec_verticies[next_i];
-            let v2_lon = self.ra_verticies[next_i];
-
-            // Check if P is on this edge
-            if is_point_on_arc(point_dec, point_ra, v1_lat, v1_lon, v2_lat, v2_lon) {
+            // Check if P is exactly on the edge A-B
+            if point_on_gc_segment(p, a, b) {
                 return PointLocation::OnBoundary;
             }
 
-            // Check if the arc from P to furthest point crosses this edge
-            if arcs_intersect(
-                point_dec,
-                point_ra,
-                furthest_point_dec,
-                furthest_point_ra,
-                v1_lat,
-                v1_lon,
-                v2_lat,
-                v2_lon,
-            ) {
-                crossing_count += 1;
-            }
+            // Project both vertices into the tangent plane of P
+            let ua = project_to_tangent(a, p);
+            let ub = project_to_tangent(b, p);
+
+            // Compute signed angle from ua → ub
+            let cross_term = dot(p, cross(ua, ub));
+            let dot_term = dot(ua, ub);
+            let angle = cross_term.atan2(dot_term);
+
+            total_angle += angle;
         }
 
-        // Even crossings = inside, odd = outside
-        if crossing_count % 2 == 0 {
+        // Classification:
+        // If magnitude of winding is ~2π → inside
+        if total_angle.abs() > std::f64::consts::PI {
             PointLocation::Inside
         } else {
             PointLocation::Outside
         }
     }
-
-    pub fn center(&self) -> [f64; 2] {
-        let ras = &self.ra_verticies;
-        let decs = &self.dec_verticies;
-
-        let n = ras.len() as f64;
-
-        // Convert to cartesian & sum
-        let (mut sx, mut sy, mut sz) = (0.0, 0.0, 0.0);
-
-        for (&ra, &dec) in ras.iter().zip(decs.iter()) {
-            let c = convert_equitorial_to_cartesian(&ra, &dec);
-            sx += c[0];
-            sy += c[1];
-            sz += c[2];
-        }
-
-        // Compute centroid vector
-        let mut cx = sx / n;
-        let mut cy = sy / n;
-        let mut cz = sz / n;
-
-        // Normalize back to unit sphere
-        let norm = (cx * cx + cy * cy + cz * cz).sqrt();
-        cx /= norm;
-        cy /= norm;
-        cz /= norm;
-
-        // Convert back to RA/Dec
-        convert_cartesian_to_equitorial(&cx, &cy, &cz)
-    }
-
-    ///  smallest radii that encompasses the entire polygon.
-    pub fn smallest_radii(&self) -> f64 {
-        let center = self.center();
-        let ras = &self.ra_verticies;
-        let decs = &self.dec_verticies;
-        let mut largest_angle = 0.0;
-        for (ra, dec) in ras.iter().zip(decs.iter()) {
-            let angle = angular_separation(&center[0], &center[1], ra, dec);
-            if angle > largest_angle {
-                largest_angle = angle
-            }
-        }
-        largest_angle
-    }
-    pub fn locate_points(&self, ras: Vec<f64>, decs: Vec<f64>) -> Vec<PointLocation> {
-        let angular_distance = self.smallest_radii();
-        let center = self.center();
-        let center_point = Point {
-            ra_deg: center[0],
-            dec_deg: center[1],
-        };
-        let tree = build_kd_tree(&ras, &decs);
-        let idx = find_idx_within(&tree, &center_point, angular_distance);
-        let mut results = vec![PointLocation::Outside; ras.len()];
-        for id in idx {
-            let local_result = self.locate_point(decs[id as usize], ras[id as usize]);
-            results[id as usize] = local_result;
-        }
-        results
-    }
 }
 
-/// Check if two arcs on a sphere intersect
-/// Arc 1: from (lat1a, lon1a) to (lat1b, lon1b)
-/// Arc 2: from (lat2a, lon2a) to (lat2b, lon2b)
-fn arcs_intersect(
-    lat1a: f64,
-    lon1a: f64,
-    lat1b: f64,
-    lon1b: f64,
-    lat2a: f64,
-    lon2a: f64,
-    lat2b: f64,
-    lon2b: f64,
-) -> bool {
-    // Transform to coordinate system where first arc's start point is north pole
-    let lon1b_t = transform_longitude(lat1a, lon1a, lat1b, lon1b);
-    let lon2a_t = transform_longitude(lat1a, lon1a, lat2a, lon2a);
-    let lon2b_t = transform_longitude(lat1a, lon1a, lat2b, lon2b);
+#[inline]
+fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
+    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+}
 
-    // Check if second arc crosses the meridian of the first arc
-    // The first arc lies along longitude lon1b_t in this coordinate system
+#[inline]
+fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
 
-    // Check if endpoints of arc 2 are on opposite sides of arc 1's meridian
-    let diff_a = normalize_longitude_difference(lon2a_t - lon1b_t);
-    let diff_b = normalize_longitude_difference(lon2b_t - lon1b_t);
+#[inline]
+fn normalize(v: [f64; 3]) -> [f64; 3] {
+    let n = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    [v[0] / n, v[1] / n, v[2] / n]
+}
 
-    // If signs are opposite and neither is exactly on the meridian, they might cross
-    if (diff_a > 0.0 && diff_b < 0.0) || (diff_a < 0.0 && diff_b > 0.0) {
-        // Now check if arc 1's endpoints straddle arc 2
-        // Transform to arc 2's coordinate system
-        let lon1a_t2 = transform_longitude(lat2a, lon2a, lat1a, lon1a);
-        let lon1b_t2 = transform_longitude(lat2a, lon2a, lat1b, lon1b);
-        let lon2b_t2 = transform_longitude(lat2a, lon2a, lat2b, lon2b);
+/// Project vector a into the tangent plane at p
+#[inline]
+fn project_to_tangent(a: [f64; 3], p: [f64; 3]) -> [f64; 3] {
+    let ap = dot(a, p);
+    normalize([a[0] - ap * p[0], a[1] - ap * p[1], a[2] - ap * p[2]])
+}
 
-        let diff1a = normalize_longitude_difference(lon1a_t2 - lon2b_t2);
-        let diff1b = normalize_longitude_difference(lon1b_t2 - lon2b_t2);
+fn point_on_gc_segment(p: [f64; 3], a: [f64; 3], b: [f64; 3]) -> bool {
+    const EPS: f64 = 1e-12;
 
-        if (diff1a > 0.0 && diff1b < 0.0) || (diff1a < 0.0 && diff1b > 0.0) {
-            return true;
-        }
+    // Check if P lies on the great circle of AB
+    let cross_ab = cross(a, b);
+    let d = dot(cross_ab, p).abs();
+    if d > EPS {
+        return false;
     }
 
-    false
-}
+    // Check if P lies *between* a and b (not beyond endpoints)
+    // by verifying angle(AP) + angle(PB) ≈ angle(AB)
+    let ang_ab = dot(a, b).acos();
+    let ang_ap = dot(a, p).acos();
+    let ang_pb = dot(p, b).acos();
 
-/// Check if a point lies on an arc (great circle segment)
-fn is_point_on_arc(
-    point_lat: f64,
-    point_lon: f64,
-    arc_lat1: f64,
-    arc_lon1: f64,
-    arc_lat2: f64,
-    arc_lon2: f64,
-) -> bool {
-    // Check if point is on the great circle through arc endpoints
-    let lon_p_t = transform_longitude(arc_lat1, arc_lon1, point_lat, point_lon);
-    let lon_2_t = transform_longitude(arc_lat1, arc_lon1, arc_lat2, arc_lon2);
-
-    if (lon_p_t - lon_2_t).abs() < 1e-9 || (lon_p_t - lon_2_t).abs() - 180.0 < 1e-9 {
-        // Point is on the great circle, now check if it's between endpoints
-        let dist_1_p = spherical_distance(arc_lat1, arc_lon1, point_lat, point_lon);
-        let dist_1_2 = spherical_distance(arc_lat1, arc_lon1, arc_lat2, arc_lon2);
-        let dist_p_2 = spherical_distance(point_lat, point_lon, arc_lat2, arc_lon2);
-
-        // Point is on arc if dist_1_p + dist_p_2 ≈ dist_1_2
-        return (dist_1_p + dist_p_2 - dist_1_2).abs() < 1e-6;
-    }
-
-    false
-}
-
-fn transform_longitude(pole_lat: f64, pole_lon: f64, target_lat: f64, target_lon: f64) -> f64 {
-    if pole_lat == 90.0 {
-        return target_lon;
-    }
-
-    let pole_lat_rad = pole_lat * DEG_TO_RAD;
-    let target_lat_rad = target_lat * DEG_TO_RAD;
-    let dlon_rad = (target_lon - pole_lon) * DEG_TO_RAD;
-
-    let num = dlon_rad.sin() * target_lat_rad.cos();
-    let den = target_lat_rad.sin() * pole_lat_rad.cos()
-        - target_lat_rad.cos() * pole_lat_rad.sin() * dlon_rad.cos();
-
-    num.atan2(den) / DEG_TO_RAD
-}
-
-fn normalize_longitude_difference(mut diff: f64) -> f64 {
-    while diff > 180.0 {
-        diff -= 360.0;
-    }
-    while diff < -180.0 {
-        diff += 360.0;
-    }
-    diff
-}
-
-fn is_antipodal(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> bool {
-    lat1 == -lat2 && normalize_longitude_difference(lon1 - lon2).abs() == 180.0
-}
-
-fn are_vertices_antipodal(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> bool {
-    is_antipodal(lat1, lon1, lat2, lon2)
-}
-
-fn spherical_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
-    let lat1_rad = lat1 * DEG_TO_RAD;
-    let lat2_rad = lat2 * DEG_TO_RAD;
-    let dlon_rad = (lon2 - lon1) * DEG_TO_RAD;
-
-    let a = ((lat2_rad - lat1_rad) / 2.0).sin();
-    let b = (dlon_rad / 2.0).sin();
-    let c = a * a + lat1_rad.cos() * lat2_rad.cos() * b * b;
-
-    2.0 * c.sqrt().asin() / DEG_TO_RAD
-}
-
-fn spherical_midpoint(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> (f64, f64) {
-    let lat1_rad = lat1 * DEG_TO_RAD;
-    let lon1_rad = lon1 * DEG_TO_RAD;
-    let lat2_rad = lat2 * DEG_TO_RAD;
-    let lon2_rad = lon2 * DEG_TO_RAD;
-
-    let x1 = lat1_rad.cos() * lon1_rad.cos();
-    let y1 = lat1_rad.cos() * lon1_rad.sin();
-    let z1 = lat1_rad.sin();
-
-    let x2 = lat2_rad.cos() * lon2_rad.cos();
-    let y2 = lat2_rad.cos() * lon2_rad.sin();
-    let z2 = lat2_rad.sin();
-
-    let x = (x1 + x2) / 2.0;
-    let y = (y1 + y2) / 2.0;
-    let z = (z1 + z2) / 2.0;
-
-    let norm = (x * x + y * y + z * z).sqrt();
-    let x = x / norm;
-    let y = y / norm;
-    let z = z / norm;
-
-    let lon = y.atan2(x) / DEG_TO_RAD;
-    let lat = z.asin() / DEG_TO_RAD;
-    (lat, lon)
+    (ang_ap + ang_pb - ang_ab).abs() < 1e-10
 }
 
 #[cfg(test)]
@@ -516,10 +228,10 @@ mod tests {
 
     #[test]
     fn test_simple_square() {
-        let lats = vec![0.0, 0.0, 1.0, 1.0];
-        let lons = vec![0.0, 1.0, 1.0, 0.0];
+        let ras = vec![0.0, 0.0, 1.0, 1.0];
+        let decs = vec![0.0, 1.0, 1.0, 0.0];
 
-        let poly = SphericalPolygon::new(lats, lons).unwrap();
+        let poly = SphericalPolygon::new(ras, decs);
 
         // Point inside
         assert_eq!(poly.locate_point(0.5, 0.5), PointLocation::Inside);
@@ -532,27 +244,16 @@ mod tests {
     }
 
     #[test]
-    fn test_larger_square() {
-        let lats = vec![0.0, 10.0, 10.0, 0.0];
-        let lons = vec![0.0, 0.0, 10.0, 10.0];
+    fn test_square_at_ra_edge() {
+        let ras = vec![359., 359., 1., 1.];
+        let decs = vec![80., 82., 82., 80.];
 
-        let poly = SphericalPolygon::new(lats, lons).unwrap();
+        let poly = SphericalPolygon::new(ras, decs);
 
-        assert_eq!(poly.locate_point(5.0, 5.0), PointLocation::Inside);
-        assert_eq!(poly.locate_point(20.0, 20.0), PointLocation::Outside);
+        assert_eq!(poly.locate_point(0., 81.), PointLocation::Inside);
+        assert_eq!(poly.locate_point(358., 81.), PointLocation::Outside);
     }
 
-    #[test]
-    fn test_center_and_radii() {
-        let lats = vec![0.0, 10.0, 10.0, 0.0];
-        let lons = vec![0.0, 0.0, 10.0, 10.0];
-        let poly = SphericalPolygon::new(lats, lons).unwrap();
-        let center = poly.center();
-        let small_rad = poly.smallest_radii();
-        assert!((center[0] - 5.).abs() < 1e-1);
-        assert!((center[1] - 5.).abs() < 1e-1);
-        assert!((small_rad - 7.071).abs() < 1e-2);
-    }
     #[test]
     fn test_aperture() {
         let aperture = SphericalAperture::new(0., 0., 1.);
