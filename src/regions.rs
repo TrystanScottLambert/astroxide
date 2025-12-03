@@ -1,5 +1,6 @@
 use crate::spherical_trig::{
     Point, angular_separation, build_kd_tree, convert_equitorial_to_cartesian, find_idx_within,
+    spherical_mean,
 };
 
 /// Result of point location query
@@ -109,13 +110,24 @@ impl SphericalAnulus {
 pub struct SphericalPolygon {
     ra_verticies: Vec<f64>,
     dec_verticies: Vec<f64>,
+    center: (f64, f64),
+    bounding_radius: f64,
 }
 
 impl SphericalPolygon {
     pub fn new(ra_verticies: Vec<f64>, dec_verticies: Vec<f64>) -> Self {
+        let center = spherical_mean(&ra_verticies, &dec_verticies);
+        let distances: Vec<f64> = ra_verticies
+            .iter()
+            .zip(dec_verticies.iter())
+            .map(|(&ra, &dec)| angular_separation(center.0, center.1, ra, dec))
+            .collect();
+        let bounding_radius = distances.into_iter().max_by(|a, b| a.total_cmp(b)).unwrap();
         SphericalPolygon {
             ra_verticies,
             dec_verticies,
+            center,
+            bounding_radius,
         }
     }
     /// Point-in-polygon using the **spherical winding number** algorithm.
@@ -166,6 +178,21 @@ impl SphericalPolygon {
         } else {
             PointLocation::Outside
         }
+    }
+
+    pub fn locate_points(&self, ra_points: &[f64], dec_points: &[f64]) -> Vec<PointLocation> {
+        let tree = build_kd_tree(ra_points, dec_points);
+        let point = Point {
+            ra_deg: self.center.0,
+            dec_deg: self.center.1,
+        };
+        let idx = find_idx_within(&tree, &point, self.bounding_radius);
+        let mut results = vec![PointLocation::Outside; self.ra_verticies.len()];
+        for id in idx {
+            results[id as usize] =
+                self.locate_point(ra_points[id as usize], dec_points[id as usize]);
+        }
+        results
     }
 }
 
