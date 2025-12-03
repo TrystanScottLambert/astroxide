@@ -1,11 +1,6 @@
-use std::f64::consts::PI;
-
 use crate::spherical_trig::{
-    Point, angular_separation, build_kd_tree, convert_cartesian_to_equitorial,
-    convert_equitorial_to_cartesian, find_idx_within,
+    Point, angular_separation, build_kd_tree, convert_equitorial_to_cartesian, find_idx_within,
 };
-
-const DEG_TO_RAD: f64 = PI / 180.0;
 
 /// Result of point location query
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +21,7 @@ pub struct SphericalAperture {
 
 impl SphericalAperture {
     pub fn locate_point(&self, ra: f64, dec: f64) -> PointLocation {
-        let sep = angular_separation(&self.ra_center, &self.dec_center, &ra, &dec);
+        let sep = angular_separation(self.ra_center, self.dec_center, ra, dec);
         if sep < self.radius_degrees {
             PointLocation::Inside
         } else if sep > self.radius_degrees {
@@ -44,7 +39,7 @@ impl SphericalAperture {
         }
     }
 
-    pub fn locate_points(&self, ras: &Vec<f64>, decs: &Vec<f64>) -> Vec<PointLocation> {
+    pub fn locate_points(&self, ras: &[f64], decs: &[f64]) -> Vec<PointLocation> {
         let tree = build_kd_tree(ras, decs);
         let point = Point {
             ra_deg: self.ra_center,
@@ -56,7 +51,7 @@ impl SphericalAperture {
             results[id as usize] = PointLocation::Inside;
         }
         results
-        // TODO: include bounday coniditon?
+        // TODO: include bounday condition?
     }
 }
 
@@ -69,7 +64,7 @@ pub struct SphericalAnulus {
 
 impl SphericalAnulus {
     pub fn locate_point(&self, ra: f64, dec: f64) -> PointLocation {
-        let sep = angular_separation(&self.ra_center, &self.dec_center, &ra, &dec);
+        let sep = angular_separation(self.ra_center, self.dec_center, ra, dec);
         if sep > self.outer_radius_deg || sep < self.inner_radius_deg {
             PointLocation::Outside
         } else if sep == self.outer_radius_deg || sep == self.inner_radius_deg {
@@ -91,7 +86,7 @@ impl SphericalAnulus {
             outer_radius_deg,
         }
     }
-    pub fn locate_points(&self, ras: &Vec<f64>, decs: &Vec<f64>) -> Vec<PointLocation> {
+    pub fn locate_points(&self, ras: &[f64], decs: &[f64]) -> Vec<PointLocation> {
         let tree = build_kd_tree(ras, decs);
         let point = Point {
             ra_deg: self.ra_center,

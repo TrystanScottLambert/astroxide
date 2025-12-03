@@ -52,7 +52,7 @@ pub fn chord_distance(angular_separation_degrees: f64) -> f64 {
 ///
 /// Arguments must be in degrees and the separation is in degrees.
 /// Using the vincenty formula which is accurate but computationally expensive.
-pub fn angular_separation(lon_1: &f64, lat_1: &f64, lon_2: &f64, lat_2: &f64) -> f64 {
+pub fn angular_separation(lon_1: f64, lat_1: f64, lon_2: f64, lat_2: f64) -> f64 {
     let lon_1_rad = lon_1.to_radians();
     let lat_1_rad = lat_1.to_radians();
     let lon_2_rad = lon_2.to_radians();
@@ -131,11 +131,11 @@ pub struct Point {
     pub dec_deg: f64,
 }
 
-pub fn build_kd_tree(ra_array_deg: &Vec<f64>, dec_array_deg: &Vec<f64>) -> ImmutableKdTree<f64, 3> {
+pub fn build_kd_tree(ra_array_deg: &[f64], dec_array_deg: &[f64]) -> ImmutableKdTree<f64, 3> {
     let entries: Vec<[f64; 3]> = ra_array_deg
         .iter()
         .zip(dec_array_deg)
-        .map(|(ra, dec)| convert_equitorial_to_cartesian(ra, &dec))
+        .map(|(ra, dec)| convert_equitorial_to_cartesian(ra, dec))
         .collect();
 
     ImmutableKdTree::new_from_slice(&entries)
@@ -150,6 +150,30 @@ pub fn find_idx_within(
     let dist = chord_distance(angular_difference_deg).powi(2); // squared chord distance.
     let neighbors = tree.within_unsorted::<SquaredEuclidean>(&point_cartesian, dist);
     neighbors.iter().map(|nn| nn.item).collect()
+}
+
+pub fn spherical_mean(ra_points: &[f64], dec_points: &[f64]) -> (f64, f64) {
+    assert_eq!(ra_points.len(), dec_points.len());
+    let mut sum = [0., 0., 0.];
+    for (ra, dec) in ra_points.iter().zip(dec_points.iter()) {
+        let v = convert_equitorial_to_cartesian(ra, dec);
+        sum[0] += v[0];
+        sum[1] += v[1];
+        sum[2] += v[2];
+    }
+
+    let norm = (sum[0].powi(2) + sum[1].powi(2) + sum[2].powi(2)).sqrt();
+    let x = sum[0] / norm;
+    let y = sum[1] / norm;
+    let z = sum[2] / norm;
+
+    let center = convert_cartesian_to_equitorial(&x, &y, &z);
+
+    let mut ra_center = center[0];
+    if ra_center < 0.0 {
+        ra_center += 360.;
+    }
+    (ra_center, center[1])
 }
 
 #[cfg(test)]
@@ -282,11 +306,16 @@ mod test {
         let answers = [45., 50.14429257, 30.37550653, 55.22172917, 70.];
 
         for i in 0..5 {
-            let res = angular_separation(&ra_1s[i], &dec_1s[i], &ra_2s[i], &dec_2s[i]);
+            let res = angular_separation(ra_1s[i], dec_1s[i], ra_2s[i], dec_2s[i]);
             dbg!(res);
             dbg!(answers[i]);
             assert!((res - answers[i]).abs() < 1e-5)
         }
+    }
+    #[test]
+    fn test_separation_over_ra_edge() {
+        let result = angular_separation(1., 0., 359., 0.);
+        assert!((result - 2.).abs() < 1e-9);
     }
 
     #[test]
@@ -298,10 +327,10 @@ mod test {
         let dec2 = -20.;
         let res = angular_separation_haversine(&ra1, &dec1, &ra2, &dec2);
         dbg!(res);
-        dbg!(angular_separation(&ra1, &dec1, &ra2, &dec2));
-        assert!((angular_separation(&ra1, &dec1, &ra2, &dec2) - res).abs() < 1e-5);
+        dbg!(angular_separation(ra1, dec1, ra2, dec2));
+        assert!((angular_separation(ra1, dec1, ra2, dec2) - res).abs() < 1e-5);
 
         let res = angular_separation_small_angle(&ra1, &dec1, &ra2, &dec2);
-        assert!((angular_separation(&ra1, &dec1, &ra2, &dec2) - res).abs() < 1e-5);
+        assert!((angular_separation(ra1, dec1, ra2, dec2) - res).abs() < 1e-5);
     }
 }
