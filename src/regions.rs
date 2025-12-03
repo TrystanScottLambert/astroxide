@@ -1,3 +1,5 @@
+use std::process::id;
+
 use crate::spherical_trig::{
     Point, angular_separation, build_kd_tree, convert_equitorial_to_cartesian, find_idx_within,
     spherical_mean,
@@ -122,7 +124,7 @@ impl SphericalPolygon {
             .zip(dec_verticies.iter())
             .map(|(&ra, &dec)| angular_separation(center.0, center.1, ra, dec))
             .collect();
-        let bounding_radius = distances.into_iter().max_by(|a, b| a.total_cmp(b)).unwrap();
+        let bounding_radius = distances.into_iter().max_by(|a, b| a.total_cmp(b)).unwrap() + 0.01;
         SphericalPolygon {
             ra_verticies,
             dec_verticies,
@@ -187,7 +189,7 @@ impl SphericalPolygon {
             dec_deg: self.center.1,
         };
         let idx = find_idx_within(&tree, &point, self.bounding_radius);
-        let mut results = vec![PointLocation::Outside; self.ra_verticies.len()];
+        let mut results = vec![PointLocation::Outside; ra_points.len()];
         for id in idx {
             results[id as usize] =
                 self.locate_point(ra_points[id as usize], dec_points[id as usize]);
@@ -274,6 +276,28 @@ mod tests {
 
         assert_eq!(poly.locate_point(0., 81.), PointLocation::Inside);
         assert_eq!(poly.locate_point(358., 81.), PointLocation::Outside);
+    }
+
+    #[test]
+    fn test_multiple_at_pole() {
+        let ra_verticies = vec![342.1537, 56.491250, 161.48667, 249.3462];
+        let dec_verticies = vec![-81.250333, -74.158250, -80.6706, -78.951];
+        let poly = SphericalPolygon::new(ra_verticies, dec_verticies);
+        let ra_points = vec![18., 270., 133.11, 133.11, 342.1537];
+        let dec_points = vec![-90., -90., -85.755, -60., -81.250333];
+
+        let answers = vec![
+            PointLocation::Inside,
+            PointLocation::Inside,
+            PointLocation::Inside,
+            PointLocation::Outside,
+            PointLocation::OnBoundary,
+        ];
+        let results = poly.locate_points(&ra_points, &dec_points);
+        for (r, a) in zip(results, answers) {
+            dbg!(&r);
+            assert_eq!(r, a)
+        }
     }
 
     #[test]
