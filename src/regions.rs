@@ -6,11 +6,7 @@ use crate::spherical_trig::{
 /// Result of point location query
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PointLocation {
-    /// Point is inside the spherical polygon
     Inside,
-    /// Point is on the boundary of the spherical polygon
-    OnBoundary,
-    /// Point is outside the spherical polygon
     Outside,
 }
 
@@ -25,10 +21,8 @@ impl SphericalAperture {
         let sep = angular_separation(self.ra_center, self.dec_center, ra, dec);
         if sep < self.radius_degrees {
             PointLocation::Inside
-        } else if sep > self.radius_degrees {
-            PointLocation::Outside
         } else {
-            PointLocation::OnBoundary
+            PointLocation::Outside
         }
     }
 
@@ -52,7 +46,6 @@ impl SphericalAperture {
             results[id as usize] = PointLocation::Inside;
         }
         results
-        // TODO: include bounday condition?
     }
 }
 
@@ -68,8 +61,6 @@ impl SphericalAnulus {
         let sep = angular_separation(self.ra_center, self.dec_center, ra, dec);
         if sep > self.outer_radius_deg || sep < self.inner_radius_deg {
             PointLocation::Outside
-        } else if sep == self.outer_radius_deg || sep == self.inner_radius_deg {
-            PointLocation::OnBoundary
         } else {
             PointLocation::Inside
         }
@@ -154,11 +145,6 @@ impl SphericalPolygon {
             let a = verts[i];
             let b = verts[(i + 1) % n];
 
-            // Check if P is exactly on the edge A-B
-            if point_on_gc_segment(p, a, b) {
-                return PointLocation::OnBoundary;
-            }
-
             // Project both vertices into the tangent plane of P
             let ua = project_to_tangent(a, p);
             let ub = project_to_tangent(b, p);
@@ -223,25 +209,6 @@ fn project_to_tangent(a: [f64; 3], p: [f64; 3]) -> [f64; 3] {
     normalize([a[0] - ap * p[0], a[1] - ap * p[1], a[2] - ap * p[2]])
 }
 
-fn point_on_gc_segment(p: [f64; 3], a: [f64; 3], b: [f64; 3]) -> bool {
-    const EPS: f64 = 1e-12;
-
-    // Check if P lies on the great circle of AB
-    let cross_ab = cross(a, b);
-    let d = dot(cross_ab, p).abs();
-    if d > EPS {
-        return false;
-    }
-
-    // Check if P lies *between* a and b (not beyond endpoints)
-    // by verifying angle(AP) + angle(PB) ≈ angle(AB)
-    let ang_ab = dot(a, b).acos();
-    let ang_ap = dot(a, p).acos();
-    let ang_pb = dot(p, b).acos();
-
-    (ang_ap + ang_pb - ang_ab).abs() < 1e-10
-}
-
 #[cfg(test)]
 mod tests {
     use std::iter::zip;
@@ -255,14 +222,8 @@ mod tests {
 
         let poly = SphericalPolygon::new(ras, decs);
 
-        // Point inside
         assert_eq!(poly.locate_point(0.5, 0.5), PointLocation::Inside);
-
-        // Point outside (as in your diagram)
         assert_eq!(poly.locate_point(2.0, 0.5), PointLocation::Outside);
-
-        // Point on boundary
-        assert_eq!(poly.locate_point(0.0, 0.0), PointLocation::OnBoundary);
     }
 
     #[test]
@@ -281,15 +242,14 @@ mod tests {
         let ra_verticies = vec![342.1537, 56.491250, 161.48667, 249.3462];
         let dec_verticies = vec![-81.250333, -74.158250, -80.6706, -78.951];
         let poly = SphericalPolygon::new(ra_verticies, dec_verticies);
-        let ra_points = vec![18., 270., 133.11, 133.11, 342.1537];
-        let dec_points = vec![-90., -90., -85.755, -60., -81.250333];
+        let ra_points = vec![18., 270., 133.11, 133.11];
+        let dec_points = vec![-90., -90., -85.755, -60.];
 
         let answers = vec![
             PointLocation::Inside,
             PointLocation::Inside,
             PointLocation::Inside,
             PointLocation::Outside,
-            PointLocation::OnBoundary,
         ];
         let results = poly.locate_points(&ra_points, &dec_points);
         for (r, a) in zip(results, answers) {
@@ -317,7 +277,6 @@ mod tests {
         assert_eq!(aperture.locate_point(0.5, 0.5), PointLocation::Inside);
         assert_eq!(aperture.locate_point(-0.5, -0.5), PointLocation::Inside);
         assert_eq!(aperture.locate_point(-2., -0.5), PointLocation::Outside);
-        assert_eq!(aperture.locate_point(0., -1.), PointLocation::OnBoundary);
     }
 
     #[test]
@@ -340,7 +299,6 @@ mod tests {
         }
         assert_eq!(anulus.locate_point(0.5, 0.5), PointLocation::Outside);
         assert_eq!(anulus.locate_point(-0.5, -0.5), PointLocation::Outside);
-        assert_eq!(anulus.locate_point(-2., 0.), PointLocation::OnBoundary);
         assert_eq!(anulus.locate_point(1.2, 0.), PointLocation::Inside);
         assert_eq!(anulus.locate_point(2.2, 0.), PointLocation::Outside);
     }
