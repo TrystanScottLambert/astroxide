@@ -1,5 +1,3 @@
-use std::process::id;
-
 use crate::spherical_trig::{
     Point, angular_separation, build_kd_tree, convert_equitorial_to_cartesian, find_idx_within,
     spherical_mean,
