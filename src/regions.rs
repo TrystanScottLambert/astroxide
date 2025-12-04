@@ -10,7 +10,7 @@ pub struct SphericalAperture {
 }
 
 impl SphericalAperture {
-    pub fn locate_point(&self, ra: f64, dec: f64) -> bool {
+    pub fn is_inside(&self, ra: f64, dec: f64) -> bool {
         angular_separation(self.ra_center, self.dec_center, ra, dec) <= self.radius_degrees
     }
 
@@ -22,7 +22,7 @@ impl SphericalAperture {
         }
     }
 
-    pub fn locate_points(&self, ras: &[f64], decs: &[f64]) -> Vec<bool> {
+    pub fn are_inside(&self, ras: &[f64], decs: &[f64]) -> Vec<bool> {
         let tree = build_kd_tree(ras, decs);
         let point = Point {
             ra_deg: self.ra_center,
@@ -45,7 +45,7 @@ pub struct SphericalAnulus {
 }
 
 impl SphericalAnulus {
-    pub fn locate_point(&self, ra: f64, dec: f64) -> bool {
+    pub fn is_inside(&self, ra: f64, dec: f64) -> bool {
         let sep = angular_separation(self.ra_center, self.dec_center, ra, dec);
         sep <= self.outer_radius_deg && sep >= self.inner_radius_deg
     }
@@ -62,7 +62,7 @@ impl SphericalAnulus {
             outer_radius_deg,
         }
     }
-    pub fn locate_points(&self, ras: &[f64], decs: &[f64]) -> Vec<bool> {
+    pub fn are_inside(&self, ras: &[f64], decs: &[f64]) -> Vec<bool> {
         let tree = build_kd_tree(ras, decs);
         let point = Point {
             ra_deg: self.ra_center,
@@ -111,7 +111,7 @@ impl SphericalPolygon {
     /// - Inside
     /// - Outside
     /// - OnBoundary (if exactly on an edge)
-    pub fn locate_point(&self, point_ra: f64, point_dec: f64) -> bool {
+    pub fn is_inside(&self, point_ra: f64, point_dec: f64) -> bool {
         // Convert P to a 3D unit vector
         let p = convert_equitorial_to_cartesian(&point_ra, &point_dec);
 
@@ -146,7 +146,7 @@ impl SphericalPolygon {
         total_angle.abs() > std::f64::consts::PI
     }
 
-    pub fn locate_points(&self, ra_points: &[f64], dec_points: &[f64]) -> Vec<bool> {
+    pub fn are_inside(&self, ra_points: &[f64], dec_points: &[f64]) -> Vec<bool> {
         let tree = build_kd_tree(ra_points, dec_points);
         let point = Point {
             ra_deg: self.center.0,
@@ -155,8 +155,7 @@ impl SphericalPolygon {
         let idx = find_idx_within(&tree, &point, self.bounding_radius);
         let mut results = vec![false; ra_points.len()];
         for id in idx {
-            results[id as usize] =
-                self.locate_point(ra_points[id as usize], dec_points[id as usize]);
+            results[id as usize] = self.is_inside(ra_points[id as usize], dec_points[id as usize]);
         }
         results
     }
@@ -202,8 +201,8 @@ mod tests {
 
         let poly = SphericalPolygon::new(ras, decs);
 
-        assert!(poly.locate_point(0.5, 0.5));
-        assert!(!poly.locate_point(2.0, 0.5));
+        assert!(poly.is_inside(0.5, 0.5));
+        assert!(!poly.is_inside(2.0, 0.5));
     }
 
     #[test]
@@ -213,8 +212,8 @@ mod tests {
 
         let poly = SphericalPolygon::new(ras, decs);
 
-        assert!(poly.locate_point(0., 81.));
-        assert!(!poly.locate_point(358., 81.));
+        assert!(poly.is_inside(0., 81.));
+        assert!(!poly.is_inside(358., 81.));
     }
 
     #[test]
@@ -224,9 +223,9 @@ mod tests {
 
         let poly = SphericalPolygon::new(ras, decs);
 
-        assert!(poly.locate_point(0., -0.3));
-        assert!(poly.locate_point(359.5, -0.3));
-        assert!(!poly.locate_point(0., -0.6));
+        assert!(poly.is_inside(0., -0.3));
+        assert!(poly.is_inside(359.5, -0.3));
+        assert!(!poly.is_inside(0., -0.6));
     }
 
     #[test]
@@ -238,7 +237,7 @@ mod tests {
         let dec_points = vec![-90., -90., -85.755, -60.];
 
         let answers = vec![true, true, true, false];
-        let results = poly.locate_points(&ra_points, &dec_points);
+        let results = poly.are_inside(&ra_points, &dec_points);
         for (r, a) in zip(results, answers) {
             dbg!(&r);
             assert_eq!(r, a)
@@ -250,33 +249,33 @@ mod tests {
         let aperture = SphericalAperture::new(0., 0., 1.);
         let ras = vec![0., 0., -0.1, 1., 2.];
         let decs = vec![0., 0.5, -0.1, 0., 2.];
-        assert!(aperture.locate_point(0., 1.));
-        assert!(aperture.locate_point(1., 0.));
-        let results = aperture.locate_points(&ras, &decs);
+        assert!(aperture.is_inside(0., 1.));
+        assert!(aperture.is_inside(1., 0.));
+        let results = aperture.are_inside(&ras, &decs);
         let answers = vec![true, true, true, true, false];
         for (r, a) in zip(results, answers) {
             assert_eq!(r, a)
         }
-        assert!(aperture.locate_point(0.5, 0.5));
-        assert!(aperture.locate_point(-0.5, -0.5));
-        assert!(!aperture.locate_point(-2., -0.5));
+        assert!(aperture.is_inside(0.5, 0.5));
+        assert!(aperture.is_inside(-0.5, -0.5));
+        assert!(!aperture.is_inside(-2., -0.5));
     }
 
     #[test]
     fn test_anulus() {
         let anulus = SphericalAnulus::new(0., 0., 1., 2.);
-        dbg!(anulus.locate_point(2., 0.));
+        dbg!(anulus.is_inside(2., 0.));
         let ras = vec![0., 0., -0.1, 1., 2., 1.1, 0.];
         let decs = vec![0., 0.5, -0.1, 0., 2., 1.1, 2.];
-        let results = anulus.locate_points(&ras, &decs);
+        let results = anulus.are_inside(&ras, &decs);
         let answers = vec![false, false, false, true, false, true, true];
         for (r, a) in zip(results, answers) {
             dbg!(&r);
             assert_eq!(r, a)
         }
-        assert!(!anulus.locate_point(0.5, 0.5));
-        assert!(!anulus.locate_point(-0.5, -0.5));
-        assert!(anulus.locate_point(1.2, 0.));
-        assert!(!anulus.locate_point(2.2, 0.));
+        assert!(!anulus.is_inside(0.5, 0.5));
+        assert!(!anulus.is_inside(-0.5, -0.5));
+        assert!(anulus.is_inside(1.2, 0.));
+        assert!(!anulus.is_inside(2.2, 0.));
     }
 }
