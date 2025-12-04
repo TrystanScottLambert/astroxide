@@ -126,6 +126,7 @@ pub fn angular_separation_small_angle(
     c.to_degrees()
 }
 
+#[derive(Debug)]
 pub struct Point {
     pub ra_deg: f64,
     pub dec_deg: f64,
@@ -201,6 +202,24 @@ mod test {
         let tree = build_kd_tree(&ras, &decs);
         let point = Point {
             ra_deg: 120.,
+            dec_deg: 0.,
+        };
+        let mut result = find_idx_within(&tree, &point, 1.);
+        assert_eq!(result.len(), 3);
+        let answers = [0, 1, 2];
+        result.sort();
+        for (res, ans) in zip(result, answers) {
+            assert_eq!(res, ans)
+        }
+    }
+
+    #[test]
+    fn test_finding_at_boundaries() {
+        let ras = vec![0., 1., 0., 270.];
+        let decs = vec![0., 0., 1., -45.];
+        let tree = build_kd_tree(&ras, &decs);
+        let point = Point {
+            ra_deg: 0.,
             dec_deg: 0.,
         };
         let mut result = find_idx_within(&tree, &point, 1.);

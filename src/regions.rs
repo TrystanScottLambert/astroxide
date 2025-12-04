@@ -19,7 +19,7 @@ pub struct SphericalAperture {
 impl SphericalAperture {
     pub fn locate_point(&self, ra: f64, dec: f64) -> PointLocation {
         let sep = angular_separation(self.ra_center, self.dec_center, ra, dec);
-        if sep < self.radius_degrees {
+        if sep <= self.radius_degrees {
             PointLocation::Inside
         } else {
             PointLocation::Outside
@@ -84,8 +84,8 @@ impl SphericalAnulus {
             ra_deg: self.ra_center,
             dec_deg: self.dec_center,
         };
-        let idx_inner = find_idx_within(&tree, &point, self.inner_radius_deg);
-        let idx_outer = find_idx_within(&tree, &point, self.outer_radius_deg);
+        let idx_inner = find_idx_within(&tree, &point, self.inner_radius_deg - f64::EPSILON);
+        let idx_outer = find_idx_within(&tree, &point, self.outer_radius_deg + 2. * f64::EPSILON);
         let mut results = vec![PointLocation::Outside; ras.len()];
         for id in idx_outer {
             results[id as usize] = PointLocation::Inside;
@@ -282,19 +282,21 @@ mod tests {
     #[test]
     fn test_anulus() {
         let anulus = SphericalAnulus::new(0., 0., 1., 2.);
-        let ras = vec![0., 0., -0.1, 1., 2., 1.1, 2.];
-        let decs = vec![0., 0.5, -0.1, 0., 2., 1.1, 0.];
+        dbg!(anulus.locate_point(2., 0.));
+        let ras = vec![0., 0., -0.1, 1., 2., 1.1, 0.];
+        let decs = vec![0., 0.5, -0.1, 0., 2., 1.1, 2.];
         let results = anulus.locate_points(&ras, &decs);
         let answers = vec![
             PointLocation::Outside,
             PointLocation::Outside,
             PointLocation::Outside,
-            PointLocation::Outside,
-            PointLocation::Outside,
             PointLocation::Inside,
             PointLocation::Outside,
+            PointLocation::Inside,
+            PointLocation::Inside,
         ];
         for (r, a) in zip(results, answers) {
+            dbg!(&r);
             assert_eq!(r, a)
         }
         assert_eq!(anulus.locate_point(0.5, 0.5), PointLocation::Outside);
