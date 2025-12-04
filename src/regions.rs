@@ -238,6 +238,18 @@ mod tests {
     }
 
     #[test]
+    fn test_concave_square() {
+        let ras = vec![359., 359., 0., 1., 1.];
+        let decs = vec![0., -2., -0.5, -2., 0.];
+
+        let poly = SphericalPolygon::new(ras, decs);
+
+        assert_eq!(poly.locate_point(0., -0.3), PointLocation::Inside);
+        assert_eq!(poly.locate_point(359.5, -0.3), PointLocation::Inside);
+        assert_eq!(poly.locate_point(0., -0.6), PointLocation::Outside);
+    }
+
+    #[test]
     fn test_multiple_at_pole() {
         let ra_verticies = vec![342.1537, 56.491250, 161.48667, 249.3462];
         let dec_verticies = vec![-81.250333, -74.158250, -80.6706, -78.951];
@@ -263,6 +275,8 @@ mod tests {
         let aperture = SphericalAperture::new(0., 0., 1.);
         let ras = vec![0., 0., -0.1, 1., 2.];
         let decs = vec![0., 0.5, -0.1, 0., 2.];
+        assert_eq!(aperture.locate_point(0., 1.), PointLocation::Inside);
+        assert_eq!(aperture.locate_point(1., 0.), PointLocation::Inside);
         let results = aperture.locate_points(&ras, &decs);
         let answers = vec![
             PointLocation::Inside,
