@@ -1,6 +1,6 @@
 [package]
 name = "astroxide"
-version = "0.0.12"
+version = "0.0.13"
 edition = "2024"
 description = "Astronomy utils for Rust."
 license = "MIT"
