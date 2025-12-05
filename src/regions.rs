@@ -65,8 +65,8 @@ impl SphericalShape for SphericalAperture {
     fn are_inside_tree(
         &self,
         tree: &ImmutableKdTree<f64, 3>,
-        ras: &[f64],
-        decs: &[f64],
+        _ras: &[f64],
+        _decs: &[f64],
     ) -> Vec<bool> {
         let point = Point {
             ra_deg: self.ra_center,
@@ -110,8 +110,8 @@ impl SphericalShape for SphericalAnulus {
     fn are_inside_tree(
         &self,
         tree: &ImmutableKdTree<f64, 3>,
-        ras: &[f64],
-        decs: &[f64],
+        _ras: &[f64],
+        _decs: &[f64],
     ) -> Vec<bool> {
         let point = Point {
             ra_deg: self.ra_center,
