@@ -358,4 +358,21 @@ mod tests {
         assert!(anulus.is_inside(1.2, 0.));
         assert!(!anulus.is_inside(2.2, 0.));
     }
+    #[test]
+    fn test_whole_catalog() {
+        let app = SphericalAperture::new(0., 0., 1.);
+        let anulus = SphericalAnulus::new(0., -90., 1., 2.);
+        let poly = SphericalPolygon::new(vec![180., 180., 181., 181.], vec![0., 1., 1., 0.]);
+        let regions: Vec<Box<dyn SphericalShape>> =
+            vec![Box::new(app), Box::new(anulus), Box::new(poly)];
+        let ra_points = vec![0., 0., 180.5, 0., 0., 179.];
+        let dec_points = vec![0., -88.2, 0.5, 2., -89.5, 0.5];
+        let answers = vec![true, true, true, false, false, false];
+        let cat = MaskingCatalog::new(&ra_points, &dec_points, &regions);
+        let results = cat.are_in_regions();
+        for (r, a) in zip(results, answers) {
+            dbg!(r);
+            assert_eq!(r, a)
+        }
+    }
 }
