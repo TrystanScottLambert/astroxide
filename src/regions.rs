@@ -1,39 +1,96 @@
+use kiddo::ImmutableKdTree;
+
 use crate::spherical_trig::{
     Point, angular_separation, build_kd_tree, convert_equitorial_to_cartesian, find_idx_within,
     spherical_mean,
 };
+fn combine_bool_vecs(list_1: Vec<bool>, list_2: Vec<bool>) -> Vec<bool> {
+    list_1
+        .iter()
+        .zip(list_2.iter())
+        .map(|(&a, &b)| a || b)
+        .collect()
+}
+pub trait SphericalShape {
+    fn is_inside(&self, ra: f64, dec: f64) -> bool;
+    fn are_inside(&self, ras: &[f64], decs: &[f64]) -> Vec<bool>;
+    fn are_inside_tree(
+        &self,
+        tree: &ImmutableKdTree<f64, 3>,
+        ras: &[f64],
+        decs: &[f64],
+    ) -> Vec<bool>;
+}
+
+pub struct MaskingCatalog<'a> {
+    ra_points: &'a [f64],
+    dec_points: &'a [f64],
+    kd_tree: ImmutableKdTree<f64, 3>,
+    regions: &'a [Box<dyn SphericalShape>],
+}
+impl<'a> MaskingCatalog<'a> {
+    pub fn new(
+        ra_points: &'a [f64],
+        dec_points: &'a [f64],
+        regions: &'a [Box<dyn SphericalShape>],
+    ) -> Self {
+        let kd_tree = build_kd_tree(ra_points, dec_points);
+        MaskingCatalog {
+            ra_points,
+            dec_points,
+            kd_tree,
+            regions,
+        }
+    }
+    pub fn are_in_regions(&self) -> Vec<bool> {
+        let mut current_results = vec![false; self.kd_tree.size()];
+        for region in self.regions.iter() {
+            let results = region.are_inside_tree(&self.kd_tree, self.ra_points, self.dec_points);
+            current_results = combine_bool_vecs(results, current_results);
+        }
+        current_results
+    }
+}
 
 pub struct SphericalAperture {
     ra_center: f64,
     dec_center: f64,
     radius_degrees: f64,
 }
-
-impl SphericalAperture {
-    pub fn is_inside(&self, ra: f64, dec: f64) -> bool {
+impl SphericalShape for SphericalAperture {
+    fn is_inside(&self, ra: f64, dec: f64) -> bool {
         angular_separation(self.ra_center, self.dec_center, ra, dec) <= self.radius_degrees
     }
 
+    fn are_inside_tree(
+        &self,
+        tree: &ImmutableKdTree<f64, 3>,
+        ras: &[f64],
+        decs: &[f64],
+    ) -> Vec<bool> {
+        let point = Point {
+            ra_deg: self.ra_center,
+            dec_deg: self.dec_center,
+        };
+        let idx = find_idx_within(&tree, &point, self.radius_degrees);
+        let mut results = vec![false; tree.size()];
+        for id in idx {
+            results[id as usize] = true;
+        }
+        results
+    }
+    fn are_inside(&self, ras: &[f64], decs: &[f64]) -> Vec<bool> {
+        let tree = build_kd_tree(ras, decs);
+        self.are_inside_tree(&tree, ras, decs)
+    }
+}
+impl SphericalAperture {
     pub fn new(ra_center: f64, dec_center: f64, radius_degrees: f64) -> Self {
         SphericalAperture {
             ra_center,
             dec_center,
             radius_degrees,
         }
-    }
-
-    pub fn are_inside(&self, ras: &[f64], decs: &[f64]) -> Vec<bool> {
-        let tree = build_kd_tree(ras, decs);
-        let point = Point {
-            ra_deg: self.ra_center,
-            dec_deg: self.dec_center,
-        };
-        let idx = find_idx_within(&tree, &point, self.radius_degrees);
-        let mut results = vec![false; ras.len()];
-        for id in idx {
-            results[id as usize] = true;
-        }
-        results
     }
 }
 
@@ -44,11 +101,40 @@ pub struct SphericalAnulus {
     outer_radius_deg: f64,
 }
 
-impl SphericalAnulus {
-    pub fn is_inside(&self, ra: f64, dec: f64) -> bool {
+impl SphericalShape for SphericalAnulus {
+    fn is_inside(&self, ra: f64, dec: f64) -> bool {
         let sep = angular_separation(self.ra_center, self.dec_center, ra, dec);
         sep <= self.outer_radius_deg && sep >= self.inner_radius_deg
     }
+
+    fn are_inside_tree(
+        &self,
+        tree: &ImmutableKdTree<f64, 3>,
+        ras: &[f64],
+        decs: &[f64],
+    ) -> Vec<bool> {
+        let point = Point {
+            ra_deg: self.ra_center,
+            dec_deg: self.dec_center,
+        };
+        let idx_inner = find_idx_within(&tree, &point, self.inner_radius_deg - f64::EPSILON);
+        let idx_outer = find_idx_within(&tree, &point, self.outer_radius_deg + 2. * f64::EPSILON);
+        let mut results = vec![false; tree.size()];
+        for id in idx_outer {
+            results[id as usize] = true;
+        }
+        for id in idx_inner {
+            results[id as usize] = false;
+        }
+        results
+    }
+    fn are_inside(&self, ras: &[f64], decs: &[f64]) -> Vec<bool> {
+        let tree = build_kd_tree(ras, decs);
+        self.are_inside_tree(&tree, ras, decs)
+    }
+}
+
+impl SphericalAnulus {
     pub fn new(
         ra_center: f64,
         dec_center: f64,
@@ -62,23 +148,6 @@ impl SphericalAnulus {
             outer_radius_deg,
         }
     }
-    pub fn are_inside(&self, ras: &[f64], decs: &[f64]) -> Vec<bool> {
-        let tree = build_kd_tree(ras, decs);
-        let point = Point {
-            ra_deg: self.ra_center,
-            dec_deg: self.dec_center,
-        };
-        let idx_inner = find_idx_within(&tree, &point, self.inner_radius_deg - f64::EPSILON);
-        let idx_outer = find_idx_within(&tree, &point, self.outer_radius_deg + 2. * f64::EPSILON);
-        let mut results = vec![false; ras.len()];
-        for id in idx_outer {
-            results[id as usize] = true;
-        }
-        for id in idx_inner {
-            results[id as usize] = false;
-        }
-        results
-    }
 }
 
 /// Represents a spherical polygon boundary
@@ -89,29 +158,14 @@ pub struct SphericalPolygon {
     bounding_radius: f64,
 }
 
-impl SphericalPolygon {
-    pub fn new(ra_verticies: Vec<f64>, dec_verticies: Vec<f64>) -> Self {
-        let center = spherical_mean(&ra_verticies, &dec_verticies);
-        let distances: Vec<f64> = ra_verticies
-            .iter()
-            .zip(dec_verticies.iter())
-            .map(|(&ra, &dec)| angular_separation(center.0, center.1, ra, dec))
-            .collect();
-        let bounding_radius = distances.into_iter().max_by(|a, b| a.total_cmp(b)).unwrap() + 0.01;
-        SphericalPolygon {
-            ra_verticies,
-            dec_verticies,
-            center,
-            bounding_radius,
-        }
-    }
+impl SphericalShape for SphericalPolygon {
     /// Point-in-polygon using the **spherical winding number** algorithm.
     ///
     /// Returns:
     /// - Inside
     /// - Outside
     /// - OnBoundary (if exactly on an edge)
-    pub fn is_inside(&self, point_ra: f64, point_dec: f64) -> bool {
+    fn is_inside(&self, point_ra: f64, point_dec: f64) -> bool {
         // Convert P to a 3D unit vector
         let p = convert_equitorial_to_cartesian(&point_ra, &point_dec);
 
@@ -146,18 +200,44 @@ impl SphericalPolygon {
         total_angle.abs() > std::f64::consts::PI
     }
 
-    pub fn are_inside(&self, ra_points: &[f64], dec_points: &[f64]) -> Vec<bool> {
-        let tree = build_kd_tree(ra_points, dec_points);
+    fn are_inside_tree(
+        &self,
+        tree: &ImmutableKdTree<f64, 3>,
+        ras: &[f64],
+        decs: &[f64],
+    ) -> Vec<bool> {
         let point = Point {
             ra_deg: self.center.0,
             dec_deg: self.center.1,
         };
         let idx = find_idx_within(&tree, &point, self.bounding_radius);
-        let mut results = vec![false; ra_points.len()];
+        let mut results = vec![false; tree.size()];
         for id in idx {
-            results[id as usize] = self.is_inside(ra_points[id as usize], dec_points[id as usize]);
+            results[id as usize] = self.is_inside(ras[id as usize], decs[id as usize]);
         }
         results
+    }
+    fn are_inside(&self, ra_points: &[f64], dec_points: &[f64]) -> Vec<bool> {
+        let tree = build_kd_tree(ra_points, dec_points);
+        self.are_inside_tree(&tree, ra_points, dec_points)
+    }
+}
+
+impl SphericalPolygon {
+    pub fn new(ra_verticies: Vec<f64>, dec_verticies: Vec<f64>) -> Self {
+        let center = spherical_mean(&ra_verticies, &dec_verticies);
+        let distances: Vec<f64> = ra_verticies
+            .iter()
+            .zip(dec_verticies.iter())
+            .map(|(&ra, &dec)| angular_separation(center.0, center.1, ra, dec))
+            .collect();
+        let bounding_radius = distances.into_iter().max_by(|a, b| a.total_cmp(b)).unwrap() + 0.01;
+        SphericalPolygon {
+            ra_verticies,
+            dec_verticies,
+            center,
+            bounding_radius,
+        }
     }
 }
 
