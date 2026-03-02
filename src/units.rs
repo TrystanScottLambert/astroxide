@@ -1,7 +1,9 @@
-use phf::phf_map;
+use std::collections::HashMap;
+use std::error::Error;
+use std::ops::{Add, Div, Mul, Sub};
 
-#[derive(Debug, PartialEq)]
-pub enum Dimension {
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum BaseDimension {
     LENGTH,
     MASS,
     TIME,
@@ -10,49 +12,160 @@ pub enum Dimension {
     DIMENSIONLESS,
 }
 
-#[derive(Debug)]
-pub struct Scale {
-    pub symbol: &'static str,
-    pub factor: f64,
+#[derive(Debug, Clone)]
+struct Dimension {
+    dims: HashMap<BaseDimension, i32>,
 }
-
-static SCALES: phf::Map<&'static str, Scale> = phf_map! {
-    "EXA" => Scale {symbol: "E" , factor: 1e18},
-    "PETA" => Scale {symbol: "P" , factor: 1e15},
-    "TERA" => Scale {symbol: "T", factor: 1e12},
-    "GIGA" => Scale {symbol: "G", factor: 1e9},
-    "MEGA" => Scale {symbol: "M", factor: 1e6},
-    "KILO" => Scale {symbol: "k", factor: 1e3},
-    "HECTO" => Scale {symbol: "h", factor: 1e2},
-    "DECA" => Scale {symbol: "da", factor: 1e1},
-    "DECI" => Scale {symbol: "d", factor: 1e-1},
-    "CENTI" => Scale {symbol: "c", factor: 1e-2},
-    "MILLI" => Scale {symbol: "m", factor: 1e-3},
-    "MICRO" => Scale {symbol: "u", factor: 1e-6},
-    "NANO" => Scale {symbol: "n", factor: 1e-9},
-    "PICO" => Scale {symbol: "p", factor: 1e-12},
-    "FEMTO" => Scale {symbol: "f", factor: 1e-15},
-    "ATTO" => Scale {symbol: "a", factor: 1e-18},
-};
-
-#[derive(Debug)]
-pub struct SIUnit {
-    pub dimension: Dimension,
-    pub scale: Scale,
-}
-
-#[derive(Debug)]
-pub struct Quantity {
-    pub value: f64,
-    pub unit: SIUnit,
-}
-
-impl Quantity {
-    pub fn to(&self, other_unit: SIUnit) -> Self {
-        if other_unit.dimension != self.unit.dimension {
-            panic!("Dimensions are not correct!")
+impl Mul for Dimension {
+    type Output = Self;
+    fn mul(self, other: Self) -> Self {
+        let mut combined = self.dims.clone();
+        for (k, v) in other.dims.iter() {
+            let current_value = self.dims.get(k).unwrap_or(&0);
+            combined.insert(*k, v + current_value);
         }
-        let ratio = other_unit.scale.factor / self.unit.scale.factor;
-        Self {value: self.value * ratio, unit: other_unit}
+        dbg!(&combined);
+        combined.retain(|_, v| *v != 0);
+        Dimension { dims: combined }
+    }
+}
+impl Div for Dimension {
+    type Output = Self;
+    fn div(self, other: Self) -> Self {
+        let mut combined = self.dims.clone();
+        for (k, v) in other.dims.iter() {
+            let current_value = self.dims.get(k).unwrap_or(&0);
+            combined.insert(*k, current_value - v);
+        }
+        dbg!(&combined);
+        combined.retain(|_, v| *v != 0);
+        Dimension { dims: combined }
+    }
+}
+impl Add for Dimension {
+    type Output = Result<Self, &'static str>;
+    fn add(self, other: Self) -> Self::Output {
+        if self.dims == other.dims {
+            Ok(Dimension { dims: self.dims })
+        } else {
+            Err("Dimensions are not the same and can't be added.")
+        }
+    }
+}
+impl Sub for Dimension {
+    type Output = Result<Self, &'static str>;
+    fn sub(self, other: Self) -> Self::Output {
+        if self.dims == other.dims {
+            Ok(Dimension { dims: self.dims })
+        } else {
+            Err("Dimensions are not the same and can't be subtracted.")
+        }
+    }
+}
+
+#[derive(PartialEq, Debug)]
+struct Unit {
+    symbol: &'static str,
+    conversion_factor: f64,
+    dimensions: HashMap<BaseDimension, i32>,
+}
+
+#[derive(PartialEq, Debug)]
+pub struct Length {
+    value: f64,
+    unit: Unit,
+}
+
+// impl Length {
+//     pub fn new(value: f64, symbol: &'static str) -> Self {
+//         Self { value, symbol }
+//     }
+//
+//     pub fn convert(&self, other: Unit) -> Self {
+//         todo!()
+//     }
+// }
+// impl Add for Length {
+//     type Output = Self;
+//     fn add(self, other: Self) -> Self {
+//         Self {
+//             value: self.value + other.value,
+//             symbol: self.symbol,
+//         }
+//     }
+// }
+//
+// impl Sub for Length {
+//     type Output = Self;
+//     fn sub(self, other: Self) -> Self {
+//         Self {
+//             value: self.value - other.value,
+//             symbol: self.symbol,
+//         }
+//     }
+// }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    // #[test]
+    // fn adding_two_lengths() {
+    //     let a = Length::new(2.0, "km") + Length::new(2.0, "km");
+    //     assert_eq!(a, Length::new(4.0, "km"));
+    // }
+
+    #[test]
+    fn multiplying_two_dimensions() {
+        let a = Dimension {
+            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
+        };
+        let b = Dimension {
+            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
+        };
+        let c = a * b;
+        assert_eq!(c.dims.len(), 2);
+        assert_eq!(*c.dims.get(&BaseDimension::LENGTH).unwrap(), 4);
+        assert_eq!(*c.dims.get(&BaseDimension::TIME).unwrap(), -2);
+    }
+
+    #[test]
+    fn multiplying_and_cancelling() {
+        // should remove factors that cancel out
+        let a = Dimension {
+            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
+        };
+        let b = Dimension {
+            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, 1)]),
+        };
+        let c = a * b;
+        assert_eq!(c.dims.len(), 1);
+        assert_eq!(*c.dims.get(&BaseDimension::LENGTH).unwrap(), 4);
+        assert_eq!(c.dims.get(&BaseDimension::TIME), None);
+    }
+    #[test]
+    fn dividing_dimensions() {
+        let a = Dimension {
+            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
+        };
+        let b = Dimension {
+            dims: HashMap::from([(BaseDimension::LENGTH, 2)]),
+        };
+        let c = b / a;
+        assert_eq!(c.dims.len(), 1);
+        assert_eq!(*c.dims.get(&BaseDimension::TIME).unwrap(), 1);
+        assert_eq!(c.dims.get(&BaseDimension::LENGTH), None);
+    }
+    #[test]
+    fn add_and_subtract_dimensions() {
+        let a = Dimension {
+            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
+        };
+        let b = Dimension {
+            dims: HashMap::from([(BaseDimension::LENGTH, 2)]),
+        };
+        let c = a.clone() + b.clone();
+        let d = a - b;
+        assert!(c.is_err());
+        assert!(d.is_err());
     }
 }
