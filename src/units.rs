@@ -184,12 +184,22 @@ mod tests {
             },
             value: 1.,
         };
-        let c = a.clone() + b;
+        let c = a.clone() + b.clone();
         assert_eq!(c.clone().unwrap().value, 1001.0);
         assert_eq!(c.clone().unwrap().symbol, "m");
         assert_eq!(c.clone().unwrap().conversion_factor, 1.);
         assert_eq!(c.clone().unwrap().dimensions, a.dimensions);
         assert!(c.clone().is_ok());
+
+        let c = a.clone() - b.clone();
+        assert_eq!(c.clone().unwrap().value, -999.0);
+        assert_eq!(c.clone().unwrap().symbol, "m");
+        assert_eq!(c.clone().unwrap().conversion_factor, 1.);
+        assert_eq!(c.clone().unwrap().dimensions, a.dimensions);
+        assert!(c.clone().is_ok());
+    }
+    #[test]
+    fn add_subtract_non_compatiable_base_units() {
         let a = BaseUnit {
             symbol: "m",
             conversion_factor: 1.,
@@ -199,18 +209,16 @@ mod tests {
             value: 1.,
         };
         let b = BaseUnit {
-            symbol: "km",
+            symbol: "s",
             conversion_factor: 1000.,
             dimensions: Dimension {
-                dims: HashMap::from([(BaseDimension::LENGTH, 1)]),
+                dims: HashMap::from([(BaseDimension::TIME, 1)]),
             },
             value: 1.,
         };
-        let c = a.clone() - b;
-        assert_eq!(c.clone().unwrap().value, -999.0);
-        assert_eq!(c.clone().unwrap().symbol, "m");
-        assert_eq!(c.clone().unwrap().conversion_factor, 1.);
-        assert_eq!(c.clone().unwrap().dimensions, a.dimensions);
-        assert!(c.clone().is_ok());
+        let c = a.clone() - b.clone();
+        let d = a.clone() + b.clone();
+        assert!(c.is_err());
+        assert!(d.is_err());
     }
 }
