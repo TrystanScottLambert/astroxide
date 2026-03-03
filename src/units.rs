@@ -89,16 +89,29 @@ impl Add for BaseUnit {
         }
     }
 }
+impl Sub for BaseUnit {
+    type Output = Result<Self, &'static str>;
+    fn sub(self, other: Self) -> Self::Output {
+        let new_dimension = self.dimensions.clone() + other.dimensions;
+        if new_dimension.is_err() {
+            Err("Units do not have equivalent dimentions and can't be added.")
+        } else {
+            let new_value = ((self.value * self.conversion_factor)
+                - (other.value * other.conversion_factor))
+                / self.conversion_factor;
+            Ok(Self {
+                symbol: self.symbol,
+                conversion_factor: self.conversion_factor,
+                dimensions: self.dimensions.clone(),
+                value: new_value,
+            })
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    // #[test]
-    // fn adding_two_lengths() {
-    //     let a = Length::new(2.0, "km") + Length::new(2.0, "km");
-    //     assert_eq!(a, Length::new(4.0, "km"));
-    // }
-
     #[test]
     fn multiplying_two_dimensions() {
         let a = Dimension {
@@ -154,7 +167,7 @@ mod tests {
         assert!(d.is_err());
     }
     #[test]
-    fn add_two_base_units() {
+    fn add_and_subtract_two_base_units() {
         let a = BaseUnit {
             symbol: "m",
             conversion_factor: 1.,
@@ -173,6 +186,28 @@ mod tests {
         };
         let c = a.clone() + b;
         assert_eq!(c.clone().unwrap().value, 1001.0);
+        assert_eq!(c.clone().unwrap().symbol, "m");
+        assert_eq!(c.clone().unwrap().conversion_factor, 1.);
+        assert_eq!(c.clone().unwrap().dimensions, a.dimensions);
+        assert!(c.clone().is_ok());
+        let a = BaseUnit {
+            symbol: "m",
+            conversion_factor: 1.,
+            dimensions: Dimension {
+                dims: HashMap::from([(BaseDimension::LENGTH, 1)]),
+            },
+            value: 1.,
+        };
+        let b = BaseUnit {
+            symbol: "km",
+            conversion_factor: 1000.,
+            dimensions: Dimension {
+                dims: HashMap::from([(BaseDimension::LENGTH, 1)]),
+            },
+            value: 1.,
+        };
+        let c = a.clone() - b;
+        assert_eq!(c.clone().unwrap().value, -999.0);
         assert_eq!(c.clone().unwrap().symbol, "m");
         assert_eq!(c.clone().unwrap().conversion_factor, 1.);
         assert_eq!(c.clone().unwrap().dimensions, a.dimensions);
