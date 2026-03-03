@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -12,7 +11,7 @@ pub enum BaseDimension {
     DIMENSIONLESS,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct Dimension {
     dims: HashMap<BaseDimension, i32>,
 }
@@ -67,7 +66,18 @@ impl Sub for Dimension {
 struct Unit {
     symbol: &'static str,
     conversion_factor: f64,
-    dimensions: HashMap<BaseDimension, i32>,
+    dimensions: Dimension,
+}
+impl Add for Unit {
+    type Output = Result<Self, &'static str>;
+    fn add(self, other: Self) -> Self::Output {
+        let new_dimension = self.dimensions + other.dimensions;
+        if new_dimension.is_err() {
+            Err("Units do not have equivalent dimentions and can't be added.")
+        } else {
+            let new_string = format!("{} {}", self.symbol, other.symbol).as_str();
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
@@ -76,34 +86,36 @@ pub struct Length {
     unit: Unit,
 }
 
-// impl Length {
-//     pub fn new(value: f64, symbol: &'static str) -> Self {
-//         Self { value, symbol }
-//     }
-//
-//     pub fn convert(&self, other: Unit) -> Self {
-//         todo!()
-//     }
-// }
-// impl Add for Length {
-//     type Output = Self;
-//     fn add(self, other: Self) -> Self {
-//         Self {
-//             value: self.value + other.value,
-//             symbol: self.symbol,
-//         }
-//     }
-// }
-//
-// impl Sub for Length {
-//     type Output = Self;
-//     fn sub(self, other: Self) -> Self {
-//         Self {
-//             value: self.value - other.value,
-//             symbol: self.symbol,
-//         }
-//     }
-// }
+impl Length {
+    pub fn new(value: f64, unit: Unit) -> Self {
+        Self { value, unit }
+    }
+
+    pub fn convert(&self, other: Unit) -> Self {
+        todo!()
+    }
+}
+impl Add for Length {
+    type Output = Result<Self, &'static str>;
+    fn add(self, other: Self) -> Self::Output {
+        let new_unit = self.unit + other.unit;
+        let new_value = self.value + other.value;
+        Ok(Self {
+            value: new_value,
+            unit: new_unit?,
+        })
+    }
+}
+
+impl Sub for Length {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        Self {
+            value: self.value - other.value,
+            symbol: self.symbol,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
