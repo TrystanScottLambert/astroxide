@@ -62,57 +62,30 @@ impl Sub for Dimension {
     }
 }
 
-#[derive(PartialEq, Debug)]
-struct Unit {
+#[derive(PartialEq, Debug, Clone)]
+struct BaseUnit {
     symbol: &'static str,
     conversion_factor: f64,
     dimensions: Dimension,
+    value: f64,
 }
-impl Add for Unit {
+
+impl Add for BaseUnit {
     type Output = Result<Self, &'static str>;
     fn add(self, other: Self) -> Self::Output {
-        let new_dimension = self.dimensions + other.dimensions;
+        let new_dimension = self.dimensions.clone() + other.dimensions;
         if new_dimension.is_err() {
             Err("Units do not have equivalent dimentions and can't be added.")
         } else {
-            let new_string = format!("{} {}", self.symbol, other.symbol).as_str();
-        }
-    }
-}
-
-#[derive(PartialEq, Debug)]
-pub struct Length {
-    value: f64,
-    unit: Unit,
-}
-
-impl Length {
-    pub fn new(value: f64, unit: Unit) -> Self {
-        Self { value, unit }
-    }
-
-    pub fn convert(&self, other: Unit) -> Self {
-        todo!()
-    }
-}
-impl Add for Length {
-    type Output = Result<Self, &'static str>;
-    fn add(self, other: Self) -> Self::Output {
-        let new_unit = self.unit + other.unit;
-        let new_value = self.value + other.value;
-        Ok(Self {
-            value: new_value,
-            unit: new_unit?,
-        })
-    }
-}
-
-impl Sub for Length {
-    type Output = Self;
-    fn sub(self, other: Self) -> Self {
-        Self {
-            value: self.value - other.value,
-            symbol: self.symbol,
+            let new_value = ((self.value * self.conversion_factor)
+                + (other.value * other.conversion_factor))
+                / self.conversion_factor;
+            Ok(Self {
+                symbol: self.symbol,
+                conversion_factor: self.conversion_factor,
+                dimensions: self.dimensions.clone(),
+                value: new_value,
+            })
         }
     }
 }
@@ -179,5 +152,30 @@ mod tests {
         let d = a - b;
         assert!(c.is_err());
         assert!(d.is_err());
+    }
+    #[test]
+    fn add_two_base_units() {
+        let a = BaseUnit {
+            symbol: "m",
+            conversion_factor: 1.,
+            dimensions: Dimension {
+                dims: HashMap::from([(BaseDimension::LENGTH, 1)]),
+            },
+            value: 1.,
+        };
+        let b = BaseUnit {
+            symbol: "km",
+            conversion_factor: 1000.,
+            dimensions: Dimension {
+                dims: HashMap::from([(BaseDimension::LENGTH, 1)]),
+            },
+            value: 1.,
+        };
+        let c = a.clone() + b;
+        assert_eq!(c.clone().unwrap().value, 1001.0);
+        assert_eq!(c.clone().unwrap().symbol, "m");
+        assert_eq!(c.clone().unwrap().conversion_factor, 1.);
+        assert_eq!(c.clone().unwrap().dimensions, a.dimensions);
+        assert!(c.clone().is_ok());
     }
 }
