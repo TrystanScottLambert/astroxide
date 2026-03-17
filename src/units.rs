@@ -15,6 +15,7 @@ pub enum BaseDimension {
 struct Dimension {
     dims: HashMap<BaseDimension, i32>,
 }
+
 impl Mul for Dimension {
     type Output = Self;
     fn mul(self, other: Self) -> Self {
@@ -62,19 +63,19 @@ impl Sub for Dimension {
     }
 }
 
+/// BaseUnits are units that have a single dimension
 #[derive(PartialEq, Debug, Clone)]
 struct BaseUnit {
     symbol: &'static str,
     conversion_factor: f64,
-    dimensions: Dimension,
+    dimension: BaseDimension,
     value: f64,
 }
 
 impl Add for BaseUnit {
     type Output = Result<Self, &'static str>;
     fn add(self, other: Self) -> Self::Output {
-        let new_dimension = self.dimensions.clone() + other.dimensions;
-        if new_dimension.is_err() {
+        if self.dimension != other.dimension {
             Err("Units do not have equivalent dimentions and can't be added.")
         } else {
             let new_value = ((self.value * self.conversion_factor)
@@ -83,7 +84,7 @@ impl Add for BaseUnit {
             Ok(Self {
                 symbol: self.symbol,
                 conversion_factor: self.conversion_factor,
-                dimensions: self.dimensions.clone(),
+                dimension: self.dimension,
                 value: new_value,
             })
         }
@@ -92,8 +93,7 @@ impl Add for BaseUnit {
 impl Sub for BaseUnit {
     type Output = Result<Self, &'static str>;
     fn sub(self, other: Self) -> Self::Output {
-        let new_dimension = self.dimensions.clone() + other.dimensions;
-        if new_dimension.is_err() {
+        if self.dimension != other.dimension {
             Err("Units do not have equivalent dimentions and can't be added.")
         } else {
             let new_value = ((self.value * self.conversion_factor)
@@ -102,7 +102,7 @@ impl Sub for BaseUnit {
             Ok(Self {
                 symbol: self.symbol,
                 conversion_factor: self.conversion_factor,
-                dimensions: self.dimensions.clone(),
+                dimension: self.dimension,
                 value: new_value,
             })
         }
@@ -171,31 +171,27 @@ mod tests {
         let a = BaseUnit {
             symbol: "m",
             conversion_factor: 1.,
-            dimensions: Dimension {
-                dims: HashMap::from([(BaseDimension::LENGTH, 1)]),
-            },
+            dimension: BaseDimension::LENGTH,
             value: 1.,
         };
         let b = BaseUnit {
             symbol: "km",
             conversion_factor: 1000.,
-            dimensions: Dimension {
-                dims: HashMap::from([(BaseDimension::LENGTH, 1)]),
-            },
+            dimension: BaseDimension::LENGTH,
             value: 1.,
         };
         let c = a.clone() + b.clone();
         assert_eq!(c.clone().unwrap().value, 1001.0);
         assert_eq!(c.clone().unwrap().symbol, "m");
         assert_eq!(c.clone().unwrap().conversion_factor, 1.);
-        assert_eq!(c.clone().unwrap().dimensions, a.dimensions);
+        assert_eq!(c.clone().unwrap().dimension, a.dimension);
         assert!(c.clone().is_ok());
 
         let c = a.clone() - b.clone();
         assert_eq!(c.clone().unwrap().value, -999.0);
         assert_eq!(c.clone().unwrap().symbol, "m");
         assert_eq!(c.clone().unwrap().conversion_factor, 1.);
-        assert_eq!(c.clone().unwrap().dimensions, a.dimensions);
+        assert_eq!(c.clone().unwrap().dimension, a.dimension);
         assert!(c.clone().is_ok());
     }
     #[test]
@@ -203,17 +199,13 @@ mod tests {
         let a = BaseUnit {
             symbol: "m",
             conversion_factor: 1.,
-            dimensions: Dimension {
-                dims: HashMap::from([(BaseDimension::LENGTH, 1)]),
-            },
+            dimension: BaseDimension::LENGTH,
             value: 1.,
         };
         let b = BaseUnit {
             symbol: "s",
             conversion_factor: 1000.,
-            dimensions: Dimension {
-                dims: HashMap::from([(BaseDimension::TIME, 1)]),
-            },
+            dimension: BaseDimension::TIME,
             value: 1.,
         };
         let c = a.clone() - b.clone();
