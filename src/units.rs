@@ -1,216 +1,309 @@
-use std::collections::HashMap;
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Mul, Sub};
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BaseDimension {
-    LENGTH,
-    MASS,
-    TIME,
-    TEMPERATURE,
-    COUNT,
-    DIMENSIONLESS,
+    LENGTH { conversion_factor: f64 },
+    MASS { conversion_factor: f64 },
+    TIME { conversion_factor: f64 },
+    TEMPERATURE { conversion_factor: f64 },
 }
 
-#[derive(Debug, Clone, PartialEq)]
-struct Dimension {
-    dims: HashMap<BaseDimension, i32>,
+impl BaseDimension {
+    fn get_conversion_factor(self) -> f64 {
+        match self {
+            BaseDimension::LENGTH { conversion_factor } => conversion_factor,
+            BaseDimension::MASS { conversion_factor } => conversion_factor,
+            BaseDimension::TIME { conversion_factor } => conversion_factor,
+            BaseDimension::TEMPERATURE { conversion_factor } => conversion_factor,
+        }
+    }
 }
 
-impl Mul for Dimension {
+#[derive(Debug, Clone, Copy)]
+pub struct BaseUnit {
+    pub dimension: BaseDimension,
+    pub symbol: &'static str,
+}
+
+impl Mul<BaseUnit> for f64 {
+    type Output = BaseQuantity;
+    fn mul(self, rhs: BaseUnit) -> Self::Output {
+        BaseQuantity {
+            unit: rhs,
+            value: self,
+        }
+    }
+}
+
+impl Mul<f64> for BaseUnit {
+    type Output = BaseQuantity;
+    fn mul(self, rhs: f64) -> Self::Output {
+        rhs * self
+    }
+}
+
+#[derive(Debug)]
+pub struct BaseQuantity {
+    pub unit: BaseUnit,
+    pub value: f64,
+}
+
+impl BaseQuantity {
+    pub fn to(&self, unit: BaseUnit) -> BaseQuantity {
+        if std::mem::discriminant(&unit.dimension) != std::mem::discriminant(&self.unit.dimension) {
+            panic!("Cannot convert to this unit. Diffent dimensions.")
+        } else {
+            let converted_value = self.value
+                * (self.unit.dimension.get_conversion_factor()
+                    / unit.dimension.get_conversion_factor());
+            BaseQuantity {
+                unit,
+                value: converted_value,
+            }
+        }
+    }
+}
+
+impl Add for BaseQuantity {
     type Output = Self;
-    fn mul(self, other: Self) -> Self {
-        let mut combined = self.dims.clone();
-        for (k, v) in other.dims.iter() {
-            let current_value = self.dims.get(k).unwrap_or(&0);
-            combined.insert(*k, v + current_value);
+    fn add(self, rhs: Self) -> Self::Output {
+        if std::mem::discriminant(&self.unit.dimension)
+            == std::mem::discriminant(&rhs.unit.dimension)
+        {
+            let base_conversion = self.value * self.unit.dimension.get_conversion_factor()
+                + rhs.value * rhs.unit.dimension.get_conversion_factor();
+            let lhs_converted = base_conversion / self.unit.dimension.get_conversion_factor();
+            BaseQuantity {
+                unit: self.unit,
+                value: lhs_converted,
+            }
+        } else {
+            panic!("THESE UNITS CANNOT BE ADDED")
         }
-        dbg!(&combined);
-        combined.retain(|_, v| *v != 0);
-        Dimension { dims: combined }
     }
 }
-impl Div for Dimension {
+impl Sub for BaseQuantity {
     type Output = Self;
-    fn div(self, other: Self) -> Self {
-        let mut combined = self.dims.clone();
-        for (k, v) in other.dims.iter() {
-            let current_value = self.dims.get(k).unwrap_or(&0);
-            combined.insert(*k, current_value - v);
-        }
-        dbg!(&combined);
-        combined.retain(|_, v| *v != 0);
-        Dimension { dims: combined }
-    }
-}
-impl Add for Dimension {
-    type Output = Result<Self, &'static str>;
-    fn add(self, other: Self) -> Self::Output {
-        if self.dims == other.dims {
-            Ok(Dimension { dims: self.dims })
+    fn sub(self, rhs: Self) -> Self::Output {
+        if std::mem::discriminant(&self.unit.dimension)
+            == std::mem::discriminant(&rhs.unit.dimension)
+        {
+            let base_conversion = self.value * self.unit.dimension.get_conversion_factor()
+                - rhs.value * rhs.unit.dimension.get_conversion_factor();
+            let lhs_converted = base_conversion / self.unit.dimension.get_conversion_factor();
+            BaseQuantity {
+                unit: self.unit,
+                value: lhs_converted,
+            }
         } else {
-            Err("Dimensions are not the same and can't be added.")
-        }
-    }
-}
-impl Sub for Dimension {
-    type Output = Result<Self, &'static str>;
-    fn sub(self, other: Self) -> Self::Output {
-        if self.dims == other.dims {
-            Ok(Dimension { dims: self.dims })
-        } else {
-            Err("Dimensions are not the same and can't be subtracted.")
+            panic!("THESE UNITS CANNOT BE SUBTRACTED")
         }
     }
 }
 
-/// BaseUnits are units that have a single dimension
-#[derive(PartialEq, Debug, Clone)]
-struct BaseUnit {
-    symbol: &'static str,
-    conversion_factor: f64,
-    dimension: BaseDimension,
-    value: f64,
+macro_rules! create_base_unit {
+    ($name: ident, $symbol: expr, $dimension: expr) => {
+        pub static $name: BaseUnit = BaseUnit {
+            dimension: $dimension,
+            symbol: $symbol,
+        };
+    };
 }
 
-impl Add for BaseUnit {
-    type Output = Result<Self, &'static str>;
-    fn add(self, other: Self) -> Self::Output {
-        if self.dimension != other.dimension {
-            Err("Units do not have equivalent dimentions and can't be added.")
-        } else {
-            let new_value = ((self.value * self.conversion_factor)
-                + (other.value * other.conversion_factor))
-                / self.conversion_factor;
-            Ok(Self {
-                symbol: self.symbol,
-                conversion_factor: self.conversion_factor,
-                dimension: self.dimension,
-                value: new_value,
-            })
-        }
-    }
+macro_rules! create_length_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::LENGTH {
+                conversion_factor: $conversion_factor
+            }
+        );
+    };
 }
-impl Sub for BaseUnit {
-    type Output = Result<Self, &'static str>;
-    fn sub(self, other: Self) -> Self::Output {
-        if self.dimension != other.dimension {
-            Err("Units do not have equivalent dimentions and can't be added.")
-        } else {
-            let new_value = ((self.value * self.conversion_factor)
-                - (other.value * other.conversion_factor))
-                / self.conversion_factor;
-            Ok(Self {
-                symbol: self.symbol,
-                conversion_factor: self.conversion_factor,
-                dimension: self.dimension,
-                value: new_value,
-            })
-        }
-    }
+macro_rules! create_mass_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::MASS {
+                conversion_factor: $conversion_factor
+            }
+        );
+    };
 }
+macro_rules! create_time_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::TIME {
+                conversion_factor: $conversion_factor
+            }
+        );
+    };
+}
+
+macro_rules! create_temperature_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::TEMPERATURE {
+                conversion_factor: $conversion_factor
+            }
+        );
+    };
+}
+
+create_length_unit!(YOTTAMETER, "Ym", 1e24);
+create_length_unit!(ZETTAMETER, "Zm", 1e21);
+create_length_unit!(EXAMETER, "Em", 1e18);
+create_length_unit!(PETAMETER, "Pm", 1e15);
+create_length_unit!(TERAMETER, "Tm", 1e12);
+create_length_unit!(GIGAMETER, "Gm", 1e9);
+create_length_unit!(MEGAMETER, "Mm", 1e6);
+create_length_unit!(KILOMETER, "km", 1e3);
+create_length_unit!(HECTOMETER, "hm", 1e2);
+create_length_unit!(DEKAMETER, "dam", 1e1);
+create_length_unit!(METER, "m", 1.);
+create_length_unit!(DECIMETER, "dm", 1e-1);
+create_length_unit!(CENTIMETER, "cm", 1e-2);
+create_length_unit!(MILLIMETER, "mm", 1e-3);
+create_length_unit!(MICROMETER, "μm", 1e-6);
+create_length_unit!(NANOMETER, "nm", 1e-9);
+create_length_unit!(PICOMETER, "pm", 1e-12);
+create_length_unit!(FEMTOMETER, "fm", 1e-15);
+create_length_unit!(ATTOMETER, "am", 1e-18);
+create_length_unit!(ZEPTOMETER, "zm", 1e-21);
+create_length_unit!(YOCTOMETER, "ym", 1e-24);
+
+// Imperial Length Units
+create_length_unit!(TWIP, "twip", 0.000017638888888);
+create_length_unit!(THOU, "th", 0.0000254);
+create_length_unit!(BARLEYCORN, "barelycorn", 0.008466666666);
+create_length_unit!(INCH, "in", 0.0254);
+create_length_unit!(HAND, "hh", 0.1016);
+create_length_unit!(FOOT, "ft", 0.3048);
+create_length_unit!(YARD, "yd", 0.9144);
+create_length_unit!(CHAIN, "ch", 20.1168);
+create_length_unit!(FURLONG, "fur", 201.168);
+create_length_unit!(MILE, "mi", 1609.344);
+create_length_unit!(LEAGUE, "lea", 4828.032);
+create_length_unit!(FATHOM, "ftm", 1.852);
+create_length_unit!(CABLE, "cable", 185.2);
+create_length_unit!(NAUTICAL_MILE, "nmi", 185.2);
+create_length_unit!(LINK, "link", 0.201168);
+create_length_unit!(ROD, "rod", 5.0292);
+
+// Astronomical Length Units
+create_length_unit!(ASTRONOMICAL_UNIT, "AU", 1.496e11);
+create_length_unit!(LIGHTYEAR, "lyr", 9.5e15);
+create_length_unit!(PARSEC, "pc", 3.09e16);
+create_length_unit!(KILO_PARSEC, "kpc", 1e3 * 3.09e16);
+create_length_unit!(MEGA_PARSEC, "Mpc", 1e6 * 3.09e16);
+create_length_unit!(GIGA_PARSEC, "Gpc", 1e9 * 3.09e16);
+
+// Metric Mass Units
+create_mass_unit!(YOTTAGRAM, "Yg", 1e24);
+create_mass_unit!(ZETTAGRAM, "Zg", 1e21);
+create_mass_unit!(EXAGRAM, "Eg", 1e18);
+create_mass_unit!(PETAGRAM, "Pg", 1e15);
+create_mass_unit!(TERAGRAM, "Tg", 1e12);
+create_mass_unit!(GIGAGRAM, "Gg", 1e9);
+create_mass_unit!(MEGAGRAM, "Mg", 1e6);
+create_mass_unit!(KILOGRAM, "kg", 1e3);
+create_mass_unit!(HECTOGRAM, "hg", 1e2);
+create_mass_unit!(DEKAGRAM, "dag", 1e1);
+create_mass_unit!(GRAM, "g", 1.);
+create_mass_unit!(DECIGRAM, "dg", 1e-1);
+create_mass_unit!(CENTIGRAM, "cg", 1e-2);
+create_mass_unit!(MILLIGRAM, "mg", 1e-3);
+create_mass_unit!(MICROGRAM, "μg", 1e-6);
+create_mass_unit!(NANOGRAM, "ng", 1e-9);
+create_mass_unit!(PICOGRAM, "pg", 1e-12);
+create_mass_unit!(FEMTOGRAM, "fg", 1e-15);
+create_mass_unit!(ATTOGRAM, "ag", 1e-18);
+create_mass_unit!(ZEPTOGRAM, "zg", 1e-21);
+create_mass_unit!(YOCTOGRAM, "yg", 1e-24);
+
+// Astronomical Mass Units
+create_mass_unit!(SOLAR_MASS, "msun", 1.988475e33);
+
+// Metric Time Units
+create_time_unit!(YOTTASECOND, "Ys", 1e24);
+create_time_unit!(ZETTASECOND, "Zs", 1e21);
+create_time_unit!(EXASECOND, "Es", 1e18);
+create_time_unit!(PETASECOND, "Ps", 1e15);
+create_time_unit!(TERASECOND, "Ts", 1e12);
+create_time_unit!(GIGASECOND, "Gs", 1e9);
+create_time_unit!(MEGASECOND, "Ms", 1e6);
+create_time_unit!(KILOSECOND, "ks", 1e3);
+create_time_unit!(HECTOSECOND, "hs", 1e2);
+create_time_unit!(DEKASECOND, "das", 1e1);
+create_time_unit!(SECOND, "s", 1.);
+create_time_unit!(DECISECOND, "ds", 1e-1);
+create_time_unit!(CENTISECOND, "cs", 1e-2);
+create_time_unit!(MILLISECOND, "ms", 1e-3);
+create_time_unit!(MICROSECOND, "μs", 1e-6);
+create_time_unit!(NANOSECOND, "ns", 1e-9);
+create_time_unit!(PICOSECOND, "ps", 1e-12);
+create_time_unit!(FEMTOSECOND, "fs", 1e-15);
+create_time_unit!(ATTOSECOND, "as", 1e-18);
+create_time_unit!(ZEPTOSECOND, "zs", 1e-21);
+create_time_unit!(YOCTOSECOND, "ys", 1e-24);
+
+create_time_unit!(MINUTE, "m", 60.);
+create_time_unit!(HOUR, "h", 3600.);
+
+// Metric Temperature units
+create_temperature_unit!(YOTTAKELVIN, "YK", 1e24);
+create_temperature_unit!(ZETTAKELVIN, "ZK", 1e21);
+create_temperature_unit!(EXAKELVIN, "EK", 1e18);
+create_temperature_unit!(PETAKELVIN, "PK", 1e15);
+create_temperature_unit!(TERAKELVIN, "TK", 1e12);
+create_temperature_unit!(GIGAKELVIN, "GK", 1e9);
+create_temperature_unit!(MEGAKELVIN, "MK", 1e6);
+create_temperature_unit!(KILOKELVIN, "kK", 1e3);
+create_temperature_unit!(HECTOKELVIN, "hK", 1e2);
+create_temperature_unit!(DEKAKELVIN, "daK", 1e1);
+create_temperature_unit!(KELVIN, "K", 1.);
+create_temperature_unit!(DECIKELVIN, "dK", 1e-1);
+create_temperature_unit!(CENTIKELVIN, "cK", 1e-2);
+create_temperature_unit!(MILLIKELVIN, "mK", 1e-3);
+create_temperature_unit!(MICROKELVIN, "μK", 1e-6);
+create_temperature_unit!(NANOKELVIN, "nK", 1e-9);
+create_temperature_unit!(PICOKELVIN, "pK", 1e-12);
+create_temperature_unit!(FEMTOKELVIN, "fK", 1e-15);
+create_temperature_unit!(ATTOKELVIN, "aK", 1e-18);
+create_temperature_unit!(ZEPTOKELVIN, "zK", 1e-21);
+create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn multiplying_two_dimensions() {
-        let a = Dimension {
-            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
-        };
-        let b = Dimension {
-            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
-        };
-        let c = a * b;
-        assert_eq!(c.dims.len(), 2);
-        assert_eq!(*c.dims.get(&BaseDimension::LENGTH).unwrap(), 4);
-        assert_eq!(*c.dims.get(&BaseDimension::TIME).unwrap(), -2);
-    }
 
     #[test]
-    fn multiplying_and_cancelling() {
-        // should remove factors that cancel out
-        let a = Dimension {
-            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
-        };
-        let b = Dimension {
-            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, 1)]),
-        };
-        let c = a * b;
-        assert_eq!(c.dims.len(), 1);
-        assert_eq!(*c.dims.get(&BaseDimension::LENGTH).unwrap(), 4);
-        assert_eq!(c.dims.get(&BaseDimension::TIME), None);
+    fn test_adding_and_converting_units() {
+        let distance_a = 5. * METER;
+        let distance_b = 2. * METER;
+        let meter_distance = distance_a + distance_b;
+        let km_distance = meter_distance.to(KILOMETER);
+        let distance = 5. * METER + 1. * KILOMETER;
+        assert_eq!(distance.value, 1005.);
+        assert_eq!(meter_distance.value, 7.);
+        assert_eq!(km_distance.value, 0.007);
     }
     #[test]
-    fn dividing_dimensions() {
-        let a = Dimension {
-            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
-        };
-        let b = Dimension {
-            dims: HashMap::from([(BaseDimension::LENGTH, 2)]),
-        };
-        let c = b / a;
-        assert_eq!(c.dims.len(), 1);
-        assert_eq!(*c.dims.get(&BaseDimension::TIME).unwrap(), 1);
-        assert_eq!(c.dims.get(&BaseDimension::LENGTH), None);
+    fn test_subtracting_units() {
+        let distance_a = 5. * KILOMETER;
+        let distance_b = 500. * METER;
+        let distance_c = CENTIMETER * 500.;
+        let test_distance = distance_a - distance_b - distance_c;
+        let test_distance_meters = test_distance.to(METER);
+        assert_eq!(test_distance.value, 4.495);
+        assert_eq!(test_distance_meters.value, 4495.);
     }
     #[test]
-    fn add_and_subtract_dimensions() {
-        let a = Dimension {
-            dims: HashMap::from([(BaseDimension::LENGTH, 2), (BaseDimension::TIME, -1)]),
-        };
-        let b = Dimension {
-            dims: HashMap::from([(BaseDimension::LENGTH, 2)]),
-        };
-        let c = a.clone() + b.clone();
-        let d = a - b;
-        assert!(c.is_err());
-        assert!(d.is_err());
-    }
-    #[test]
-    fn add_and_subtract_two_base_units() {
-        let a = BaseUnit {
-            symbol: "m",
-            conversion_factor: 1.,
-            dimension: BaseDimension::LENGTH,
-            value: 1.,
-        };
-        let b = BaseUnit {
-            symbol: "km",
-            conversion_factor: 1000.,
-            dimension: BaseDimension::LENGTH,
-            value: 1.,
-        };
-        let c = a.clone() + b.clone();
-        assert_eq!(c.clone().unwrap().value, 1001.0);
-        assert_eq!(c.clone().unwrap().symbol, "m");
-        assert_eq!(c.clone().unwrap().conversion_factor, 1.);
-        assert_eq!(c.clone().unwrap().dimension, a.dimension);
-        assert!(c.clone().is_ok());
-
-        let c = a.clone() - b.clone();
-        assert_eq!(c.clone().unwrap().value, -999.0);
-        assert_eq!(c.clone().unwrap().symbol, "m");
-        assert_eq!(c.clone().unwrap().conversion_factor, 1.);
-        assert_eq!(c.clone().unwrap().dimension, a.dimension);
-        assert!(c.clone().is_ok());
-    }
-    #[test]
-    fn add_subtract_non_compatiable_base_units() {
-        let a = BaseUnit {
-            symbol: "m",
-            conversion_factor: 1.,
-            dimension: BaseDimension::LENGTH,
-            value: 1.,
-        };
-        let b = BaseUnit {
-            symbol: "s",
-            conversion_factor: 1000.,
-            dimension: BaseDimension::TIME,
-            value: 1.,
-        };
-        let c = a.clone() - b.clone();
-        let d = a.clone() + b.clone();
-        assert!(c.is_err());
-        assert!(d.is_err());
-    }
+    fn test_derived_units
 }
