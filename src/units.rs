@@ -1,8 +1,7 @@
 use fmtastic::Superscript;
 use std::{
     collections::HashMap,
-    fmt::format,
-    ops::{Add, Mul, Sub},
+    ops::{Add, Div, Mul, Sub},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -11,19 +10,64 @@ pub enum BaseDimension {
     MASS,
     TIME,
     TEMPERATURE,
+    UNITLESS,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Dimension {
     pub base: BaseDimension,
     pub exponent: i32,
 }
+impl Mul for Dimension {
+    type Output = Vec<Dimension>;
+    fn mul(self, rhs: Self) -> Self::Output {
+        if self.base == rhs.base {
+            if self.exponent == -rhs.exponent {
+                vec![Dimension {
+                    base: BaseDimension::UNITLESS,
+                    exponent: 0,
+                }]
+            } else {
+                vec![Dimension {
+                    base: self.base,
+                    exponent: self.exponent + rhs.exponent,
+                }]
+            }
+        } else {
+            vec![self, rhs]
+        }
+    }
+}
 
+impl Div for Dimension {
+    type Output = Vec<Dimension>;
+    fn div(self, rhs: Self) -> Self::Output {
+        if self.base == rhs.base {
+            if self.exponent == rhs.exponent {
+                vec![Dimension {
+                    base: BaseDimension::UNITLESS,
+                    exponent: 0,
+                }]
+            } else {
+                vec![Dimension {
+                    base: self.base,
+                    exponent: self.exponent - rhs.exponent,
+                }]
+            }
+        } else {
+            let negative_rhs = Dimension {
+                base: rhs.base,
+                exponent: -rhs.exponent,
+            };
+            vec![self, negative_rhs]
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BaseUnit {
-    pub base_dimension: BaseDimension,
+    pub base_dimension: Dimension,
     pub symbol: &'static str,
     pub conversion_factor: f64,
-    pub exponent: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -49,11 +93,13 @@ impl Mul<f64> for BaseUnit {
     }
 }
 
-fn print_unit_from_units(units: Vec<BaseUnit>) -> String {
+pub fn print_unit_from_units(units: Vec<BaseUnit>) -> String {
     let mut unit_count: HashMap<&'static str, i32> = HashMap::new();
     let symbols: Vec<&'static str> = units.iter().map(|u| u.symbol).collect();
-    for symbol in symbols {
-        *unit_count.entry(symbol).or_insert(0) += 1;
+    let exponents: Vec<i32> = units.iter().map(|u| u.base_dimension.exponent).collect();
+
+    for (symbol, exp) in symbols.into_iter().zip(exponents) {
+        *unit_count.entry(symbol).or_insert(0) += exp;
     }
     let mut output = String::new();
     for (&k, v) in unit_count.iter() {
@@ -127,6 +173,8 @@ macro_rules! create_base_unit {
         };
     };
 }
+
+create_base_unit!(UNITLESS, "", BaseDimension::UNITLESS, 0., 0);
 
 macro_rules! create_length_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
@@ -309,15 +357,17 @@ mod tests {
     fn test_printing_derived_units() {
         let a = vec![METER, METER, SECOND, KILOMETER];
         let b = print_unit_from_units(a);
-        assert_eq!(b, "s¹km¹m²".to_string())
+        println!("{b}");
+        panic!()
     }
 
-    // #[test]
-    // fn test_derived_units() {
-    //     let x = 5. * KILOMETER;
-    //     let y = 10. * SECOND;
-    //     let velocity = x / y;
-    //     let velocity_mh = velocity.to(METER / HOUR);
-    //     assert_eq!(velocity.value, 0.5);
-    // }
+    #[test]
+    fn test_derived_units() {
+        let x = 5. * KILOMETER;
+        let y = 10. * SECOND;
+        let somethign = x * y;
+        let velocity = x / y;
+        let velocity_mh = velocity.to(METER / HOUR);
+        assert_eq!(velocity.value, 0.5);
+    }
 }
