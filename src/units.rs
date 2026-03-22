@@ -51,9 +51,7 @@ pub struct BaseQuantity {
 
 impl BaseQuantity {
     pub fn to(&self, unit: BaseUnit) -> BaseQuantity {
-        if std::mem::discriminant(&unit.base_dimension)
-            != std::mem::discriminant(&self.unit.base_dimension)
-        {
+        if unit.base_dimension != self.unit.base_dimension {
             panic!("Cannot convert to this unit. Diffent dimensions.")
         } else {
             let converted_value =
@@ -69,9 +67,7 @@ impl BaseQuantity {
 impl Add for BaseQuantity {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        if std::mem::discriminant(&self.unit.base_dimension)
-            == std::mem::discriminant(&rhs.unit.base_dimension)
-        {
+        if self.unit.base_dimension == rhs.unit.base_dimension {
             let base_conversion =
                 self.value * self.unit.conversion_factor + rhs.value * rhs.unit.conversion_factor;
             let lhs_converted = base_conversion / self.unit.conversion_factor;
@@ -87,9 +83,7 @@ impl Add for BaseQuantity {
 impl Sub for BaseQuantity {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        if std::mem::discriminant(&self.unit.base_dimension)
-            == std::mem::discriminant(&rhs.unit.base_dimension)
-        {
+        if self.unit.base_dimension == rhs.unit.base_dimension {
             let base_conversion =
                 self.value * self.unit.conversion_factor - rhs.value * rhs.unit.conversion_factor;
             let lhs_converted = base_conversion / self.unit.conversion_factor;
