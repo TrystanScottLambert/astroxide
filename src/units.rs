@@ -18,6 +18,7 @@ pub struct Dimension {
     pub base: BaseDimension,
     pub exponent: i32,
 }
+
 impl Mul for Dimension {
     type Output = Vec<Dimension>;
     fn mul(self, rhs: Self) -> Self::Output {
@@ -70,10 +71,81 @@ pub struct BaseUnit {
     pub conversion_factor: f64,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ImplBaseUnit {
+    pub base_unit: BaseUnit,
+    pub exponent: i32,
+}
+
+#[derive(Debug)]
+pub struct Units<'a> {
+    pub base_units: &'a mut Vec<ImplBaseUnit>,
+}
+impl Units<'_> {
+    pub fn get_units_list(&self) -> Vec<BaseUnit> {
+        self.base_units.iter().map(|iu| iu.base_unit).collect()
+    }
+
+    pub fn push(self, unit: ImplBaseUnit) {
+        let unit_list = self.get_units_list();
+        if unit_list.contains(&unit.base_unit) {
+            for iu in self.base_units {
+                if iu.base_unit == unit.base_unit {
+                    *iu = ImplBaseUnit {
+                        base_unit: iu.base_unit,
+                        exponent: iu.exponent + 1,
+                    }
+                }
+            }
+        } else {
+            self.base_units.push(unit);
+        }
+    }
+}
+
+impl Mul<BaseUnit> for BaseUnit {
+    type Output = DerivedUnit;
+    fn mul(self, rhs: Self) -> Self::Output {
+        if self == rhs {
+            DerivedUnit {
+                base_units: vec![(self, 2)],
+            }
+        } else {
+            DerivedUnit {
+                base_units: vec![(self, 1), (rhs, 1)],
+            }
+        }
+    }
+}
+
+impl Div<BaseUnit> for BaseUnit {
+    type Output = DerivedUnit;
+    fn div(self, rhs: Self) -> Self::Output {
+        if self == rhs {
+            DerivedUnit {
+                base_units: vec![(UNITLESS, 0)],
+            }
+        } else {
+            DerivedUnit {
+                base_units: vec![(self, 1), (rhs, -1)],
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DerivedUnit {
-    pub base_units: Vec<BaseUnit>,
-    pub symbol: String,
+    pub base_units: Vec<(BaseUnit, i32)>,
+}
+
+impl DerivedUnit {
+    pub fn symbol(self) -> String {
+        todo!()
+    }
+
+    pub fn dimensions(self) -> String {
+        todo!()
+    }
 }
 
 impl Mul<BaseUnit> for f64 {
@@ -91,22 +163,6 @@ impl Mul<f64> for BaseUnit {
     fn mul(self, rhs: f64) -> Self::Output {
         rhs * self
     }
-}
-
-pub fn print_unit_from_units(units: Vec<BaseUnit>) -> String {
-    let mut unit_count: HashMap<&'static str, i32> = HashMap::new();
-    let symbols: Vec<&'static str> = units.iter().map(|u| u.symbol).collect();
-    let exponents: Vec<i32> = units.iter().map(|u| u.base_dimension.exponent).collect();
-
-    for (symbol, exp) in symbols.into_iter().zip(exponents) {
-        *unit_count.entry(symbol).or_insert(0) += exp;
-    }
-    let mut output = String::new();
-    for (&k, v) in unit_count.iter() {
-        let current_unit = format!("{}{}", k, Superscript(*v));
-        output.push_str(&current_unit);
-    }
-    output
 }
 
 #[derive(Debug)]
@@ -166,10 +222,12 @@ impl Sub for BaseQuantity {
 macro_rules! create_base_unit {
     ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr, $exponent: expr) => {
         pub static $name: BaseUnit = BaseUnit {
-            base_dimension: $dimension,
+            base_dimension: Dimension {
+                base: $dimension,
+                exponent: $exponent,
+            },
             symbol: $symbol,
             conversion_factor: $conversion_factor,
-            exponent: $exponent,
         };
     };
 }
@@ -301,8 +359,8 @@ create_time_unit!(ATTOSECOND, "as", 1e-18);
 create_time_unit!(ZEPTOSECOND, "zs", 1e-21);
 create_time_unit!(YOCTOSECOND, "ys", 1e-24);
 
-create_time_unit!(MINUTE, "m", 60.);
-create_time_unit!(HOUR, "h", 3600.);
+create_time_unit!(MINUTE, "min", 60.);
+create_time_unit!(HOUR, "hr", 3600.);
 
 // Metric Temperature units
 create_temperature_unit!(YOTTAKELVIN, "YK", 1e24);
@@ -356,7 +414,7 @@ mod tests {
     #[test]
     fn test_printing_derived_units() {
         let a = vec![METER, METER, SECOND, KILOMETER];
-        let b = print_unit_from_units(a);
+        let b = concatenate_unit_strings(a);
         println!("{b}");
         panic!()
     }
