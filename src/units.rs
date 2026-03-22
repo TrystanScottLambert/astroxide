@@ -5,7 +5,7 @@ use std::{
     ops::{Add, Mul, Sub},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BaseDimension {
     LENGTH,
     MASS,
@@ -41,6 +41,15 @@ impl Mul<f64> for BaseUnit {
     fn mul(self, rhs: f64) -> Self::Output {
         rhs * self
     }
+}
+
+fn decompose_units(units: Vec<BaseUnit>) -> HashMap<BaseDimension, i32> {
+    let mut dimension_count = HashMap::new();
+    let dimensions: Vec<BaseDimension> = units.iter().map(|u| u.base_dimension).collect();
+    for dim in dimensions {
+        *dimension_count.entry(dim).or_insert(0) += 1;
+    }
+    dimension_count
 }
 
 #[derive(Debug)]
@@ -281,6 +290,13 @@ mod tests {
         let test_distance_meters = test_distance.to(METER);
         assert_eq!(test_distance.value, 4.495);
         assert_eq!(test_distance_meters.value, 4495.);
+    }
+    #[test]
+    fn test_decomposing() {
+        let a = vec![METER, METER, SECOND];
+        let b = decompose_units(a);
+        assert_eq!(b[&BaseDimension::LENGTH], 2);
+        assert_eq!(b[&BaseDimension::TIME], 1);
     }
     // #[test]
     // fn test_derived_units() {
