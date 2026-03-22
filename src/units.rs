@@ -1,28 +1,29 @@
-use std::ops::{Add, Mul, Sub};
+use fmtastic::Superscript;
+use std::{
+    collections::HashMap,
+    fmt::format,
+    ops::{Add, Mul, Sub},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BaseDimension {
-    LENGTH { conversion_factor: f64 },
-    MASS { conversion_factor: f64 },
-    TIME { conversion_factor: f64 },
-    TEMPERATURE { conversion_factor: f64 },
-}
-
-impl BaseDimension {
-    fn get_conversion_factor(self) -> f64 {
-        match self {
-            BaseDimension::LENGTH { conversion_factor } => conversion_factor,
-            BaseDimension::MASS { conversion_factor } => conversion_factor,
-            BaseDimension::TIME { conversion_factor } => conversion_factor,
-            BaseDimension::TEMPERATURE { conversion_factor } => conversion_factor,
-        }
-    }
+    LENGTH,
+    MASS,
+    TIME,
+    TEMPERATURE,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct BaseUnit {
-    pub dimension: BaseDimension,
+    pub base_dimension: BaseDimension,
     pub symbol: &'static str,
+    pub conversion_factor: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct DerivedUnit {
+    pub base_units: Vec<BaseUnit>,
+    pub symbol: String,
 }
 
 impl Mul<BaseUnit> for f64 {
@@ -50,12 +51,13 @@ pub struct BaseQuantity {
 
 impl BaseQuantity {
     pub fn to(&self, unit: BaseUnit) -> BaseQuantity {
-        if std::mem::discriminant(&unit.dimension) != std::mem::discriminant(&self.unit.dimension) {
+        if std::mem::discriminant(&unit.base_dimension)
+            != std::mem::discriminant(&self.unit.base_dimension)
+        {
             panic!("Cannot convert to this unit. Diffent dimensions.")
         } else {
-            let converted_value = self.value
-                * (self.unit.dimension.get_conversion_factor()
-                    / unit.dimension.get_conversion_factor());
+            let converted_value =
+                self.value * (self.unit.conversion_factor / unit.conversion_factor);
             BaseQuantity {
                 unit,
                 value: converted_value,
@@ -67,12 +69,12 @@ impl BaseQuantity {
 impl Add for BaseQuantity {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        if std::mem::discriminant(&self.unit.dimension)
-            == std::mem::discriminant(&rhs.unit.dimension)
+        if std::mem::discriminant(&self.unit.base_dimension)
+            == std::mem::discriminant(&rhs.unit.base_dimension)
         {
-            let base_conversion = self.value * self.unit.dimension.get_conversion_factor()
-                + rhs.value * rhs.unit.dimension.get_conversion_factor();
-            let lhs_converted = base_conversion / self.unit.dimension.get_conversion_factor();
+            let base_conversion =
+                self.value * self.unit.conversion_factor + rhs.value * rhs.unit.conversion_factor;
+            let lhs_converted = base_conversion / self.unit.conversion_factor;
             BaseQuantity {
                 unit: self.unit,
                 value: lhs_converted,
@@ -85,62 +87,45 @@ impl Add for BaseQuantity {
 impl Sub for BaseQuantity {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        if std::mem::discriminant(&self.unit.dimension)
-            == std::mem::discriminant(&rhs.unit.dimension)
+        if std::mem::discriminant(&self.unit.base_dimension)
+            == std::mem::discriminant(&rhs.unit.base_dimension)
         {
-            let base_conversion = self.value * self.unit.dimension.get_conversion_factor()
-                - rhs.value * rhs.unit.dimension.get_conversion_factor();
-            let lhs_converted = base_conversion / self.unit.dimension.get_conversion_factor();
+            let base_conversion =
+                self.value * self.unit.conversion_factor - rhs.value * rhs.unit.conversion_factor;
+            let lhs_converted = base_conversion / self.unit.conversion_factor;
             BaseQuantity {
                 unit: self.unit,
                 value: lhs_converted,
             }
         } else {
-            panic!("THESE UNITS CANNOT BE SUBTRACTED")
+            panic!("THESE UNITS CANNOT BE ADDED")
         }
     }
 }
 
 macro_rules! create_base_unit {
-    ($name: ident, $symbol: expr, $dimension: expr) => {
+    ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr) => {
         pub static $name: BaseUnit = BaseUnit {
-            dimension: $dimension,
+            base_dimension: $dimension,
             symbol: $symbol,
+            conversion_factor: $conversion_factor,
         };
     };
 }
 
 macro_rules! create_length_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            BaseDimension::LENGTH {
-                conversion_factor: $conversion_factor
-            }
-        );
+        create_base_unit!($name, $symbol, BaseDimension::LENGTH, $conversion_factor);
     };
 }
 macro_rules! create_mass_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            BaseDimension::MASS {
-                conversion_factor: $conversion_factor
-            }
-        );
+        create_base_unit!($name, $symbol, BaseDimension::MASS, $conversion_factor);
     };
 }
 macro_rules! create_time_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            BaseDimension::TIME {
-                conversion_factor: $conversion_factor
-            }
-        );
+        create_base_unit!($name, $symbol, BaseDimension::TIME, $conversion_factor);
     };
 }
 
@@ -149,9 +134,8 @@ macro_rules! create_temperature_unit {
         create_base_unit!(
             $name,
             $symbol,
-            BaseDimension::TEMPERATURE {
-                conversion_factor: $conversion_factor
-            }
+            BaseDimension::TEMPERATURE,
+            $conversion_factor
         );
     };
 }
@@ -304,6 +288,12 @@ mod tests {
         assert_eq!(test_distance.value, 4.495);
         assert_eq!(test_distance_meters.value, 4495.);
     }
-    #[test]
-    fn test_derived_units
+    // #[test]
+    // fn test_derived_units() {
+    //     let x = 5. * KILOMETER;
+    //     let y = 10. * SECOND;
+    //     let velocity = x / y;
+    //     let velocity_mh = velocity.to(METER / HOUR);
+    //     assert_eq!(velocity.value, 0.5);
+    // }
 }

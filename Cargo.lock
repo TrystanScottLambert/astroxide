@@ -21,6 +21,7 @@ checksum = "3d62b7694a562cdf5a74227903507c56ab2cc8bdd1f781ed5cb4cf9c9f810bfc"
 name = "astroxide"
 version = "0.0.14"
 dependencies = [
+ "fmtastic",
  "kiddo",
  "libm",
  "phf",
@@ -160,6 +161,12 @@ dependencies = [
  "num-traits",
  "typenum",
 ]
+
+[[package]]
+name = "fmtastic"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1216c1a577486ca3c8153aa344ce8f985bb99e2e8e7a62f0119ecd924f7499a1"
 
 [[package]]
 name = "generator"
