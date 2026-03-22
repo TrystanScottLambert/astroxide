@@ -13,11 +13,17 @@ pub enum BaseDimension {
     TEMPERATURE,
 }
 
+pub struct Dimension {
+    pub base: BaseDimension,
+    pub exponent: i32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BaseUnit {
     pub base_dimension: BaseDimension,
     pub symbol: &'static str,
     pub conversion_factor: f64,
+    pub exponent: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -41,15 +47,6 @@ impl Mul<f64> for BaseUnit {
     fn mul(self, rhs: f64) -> Self::Output {
         rhs * self
     }
-}
-
-fn decompose_units(units: Vec<BaseUnit>) -> HashMap<BaseDimension, i32> {
-    let mut dimension_count = HashMap::new();
-    let dimensions: Vec<BaseDimension> = units.iter().map(|u| u.base_dimension).collect();
-    for dim in dimensions {
-        *dimension_count.entry(dim).or_insert(0) += 1;
-    }
-    dimension_count
 }
 
 fn print_unit_from_units(units: Vec<BaseUnit>) -> String {
@@ -121,28 +118,29 @@ impl Sub for BaseQuantity {
 }
 
 macro_rules! create_base_unit {
-    ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr) => {
+    ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr, $exponent: expr) => {
         pub static $name: BaseUnit = BaseUnit {
             base_dimension: $dimension,
             symbol: $symbol,
             conversion_factor: $conversion_factor,
+            exponent: $exponent,
         };
     };
 }
 
 macro_rules! create_length_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::LENGTH, $conversion_factor);
+        create_base_unit!($name, $symbol, BaseDimension::LENGTH, $conversion_factor, 1);
     };
 }
 macro_rules! create_mass_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::MASS, $conversion_factor);
+        create_base_unit!($name, $symbol, BaseDimension::MASS, $conversion_factor, 1);
     };
 }
 macro_rules! create_time_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::TIME, $conversion_factor);
+        create_base_unit!($name, $symbol, BaseDimension::TIME, $conversion_factor, 1);
     };
 }
 
@@ -152,7 +150,8 @@ macro_rules! create_temperature_unit {
             $name,
             $symbol,
             BaseDimension::TEMPERATURE,
-            $conversion_factor
+            $conversion_factor,
+            1
         );
     };
 }
@@ -305,20 +304,12 @@ mod tests {
         assert_eq!(test_distance.value, 4.495);
         assert_eq!(test_distance_meters.value, 4495.);
     }
-    #[test]
-    fn test_decomposing() {
-        let a = vec![METER, METER, SECOND];
-        let b = decompose_units(a);
-        assert_eq!(b[&BaseDimension::LENGTH], 2);
-        assert_eq!(b[&BaseDimension::TIME], 1);
-    }
 
     #[test]
     fn test_printing_derived_units() {
         let a = vec![METER, METER, SECOND, KILOMETER];
         let b = print_unit_from_units(a);
-        println!("{b}");
-        panic!()
+        assert_eq!(b, "s¹km¹m²".to_string())
     }
 
     // #[test]
