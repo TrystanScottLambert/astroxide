@@ -13,7 +13,7 @@ pub enum BaseDimension {
     TEMPERATURE,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BaseUnit {
     pub base_dimension: BaseDimension,
     pub symbol: &'static str,
@@ -50,6 +50,20 @@ fn decompose_units(units: Vec<BaseUnit>) -> HashMap<BaseDimension, i32> {
         *dimension_count.entry(dim).or_insert(0) += 1;
     }
     dimension_count
+}
+
+fn print_unit_from_units(units: Vec<BaseUnit>) -> String {
+    let mut unit_count: HashMap<&'static str, i32> = HashMap::new();
+    let symbols: Vec<&'static str> = units.iter().map(|u| u.symbol).collect();
+    for symbol in symbols {
+        *unit_count.entry(symbol).or_insert(0) += 1;
+    }
+    let mut output = String::new();
+    for (&k, v) in unit_count.iter() {
+        let current_unit = format!("{}{}", k, Superscript(*v));
+        output.push_str(&current_unit);
+    }
+    output
 }
 
 #[derive(Debug)]
@@ -298,6 +312,15 @@ mod tests {
         assert_eq!(b[&BaseDimension::LENGTH], 2);
         assert_eq!(b[&BaseDimension::TIME], 1);
     }
+
+    #[test]
+    fn test_printing_derived_units() {
+        let a = vec![METER, METER, SECOND, KILOMETER];
+        let b = print_unit_from_units(a);
+        println!("{b}");
+        panic!()
+    }
+
     // #[test]
     // fn test_derived_units() {
     //     let x = 5. * KILOMETER;
