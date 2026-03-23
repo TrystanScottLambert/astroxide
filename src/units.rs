@@ -64,6 +64,7 @@ impl Div for Dimension {
         }
     }
 }
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BaseUnit {
     pub base_dimension: Dimension,
@@ -78,10 +79,11 @@ pub struct ImplBaseUnit {
 }
 
 #[derive(Debug)]
-pub struct Units<'a> {
+pub struct Unit<'a> {
     pub base_units: &'a mut Vec<ImplBaseUnit>,
 }
-impl Units<'_> {
+
+impl Unit<'_> {
     pub fn get_units_list(&self) -> Vec<BaseUnit> {
         self.base_units.iter().map(|iu| iu.base_unit).collect()
     }
@@ -103,120 +105,10 @@ impl Units<'_> {
     }
 }
 
-impl Mul<BaseUnit> for BaseUnit {
-    type Output = DerivedUnit;
-    fn mul(self, rhs: Self) -> Self::Output {
-        if self == rhs {
-            DerivedUnit {
-                base_units: vec![(self, 2)],
-            }
-        } else {
-            DerivedUnit {
-                base_units: vec![(self, 1), (rhs, 1)],
-            }
-        }
-    }
-}
-
-impl Div<BaseUnit> for BaseUnit {
-    type Output = DerivedUnit;
-    fn div(self, rhs: Self) -> Self::Output {
-        if self == rhs {
-            DerivedUnit {
-                base_units: vec![(UNITLESS, 0)],
-            }
-        } else {
-            DerivedUnit {
-                base_units: vec![(self, 1), (rhs, -1)],
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DerivedUnit {
-    pub base_units: Vec<(BaseUnit, i32)>,
-}
-
-impl DerivedUnit {
-    pub fn symbol(self) -> String {
-        todo!()
-    }
-
-    pub fn dimensions(self) -> String {
-        todo!()
-    }
-}
-
-impl Mul<BaseUnit> for f64 {
-    type Output = BaseQuantity;
-    fn mul(self, rhs: BaseUnit) -> Self::Output {
-        BaseQuantity {
-            unit: rhs,
-            value: self,
-        }
-    }
-}
-
-impl Mul<f64> for BaseUnit {
-    type Output = BaseQuantity;
-    fn mul(self, rhs: f64) -> Self::Output {
-        rhs * self
-    }
-}
-
 #[derive(Debug)]
-pub struct BaseQuantity {
-    pub unit: BaseUnit,
+pub struct Quantity<'a> {
+    pub unit: Unit<'a>,
     pub value: f64,
-}
-
-impl BaseQuantity {
-    pub fn to(&self, unit: BaseUnit) -> BaseQuantity {
-        if unit.base_dimension != self.unit.base_dimension {
-            panic!("Cannot convert to this unit. Diffent dimensions.")
-        } else {
-            let converted_value =
-                self.value * (self.unit.conversion_factor / unit.conversion_factor);
-            BaseQuantity {
-                unit,
-                value: converted_value,
-            }
-        }
-    }
-}
-
-impl Add for BaseQuantity {
-    type Output = Self;
-    fn add(self, rhs: Self) -> Self::Output {
-        if self.unit.base_dimension == rhs.unit.base_dimension {
-            let base_conversion =
-                self.value * self.unit.conversion_factor + rhs.value * rhs.unit.conversion_factor;
-            let lhs_converted = base_conversion / self.unit.conversion_factor;
-            BaseQuantity {
-                unit: self.unit,
-                value: lhs_converted,
-            }
-        } else {
-            panic!("THESE UNITS CANNOT BE ADDED")
-        }
-    }
-}
-impl Sub for BaseQuantity {
-    type Output = Self;
-    fn sub(self, rhs: Self) -> Self::Output {
-        if self.unit.base_dimension == rhs.unit.base_dimension {
-            let base_conversion =
-                self.value * self.unit.conversion_factor - rhs.value * rhs.unit.conversion_factor;
-            let lhs_converted = base_conversion / self.unit.conversion_factor;
-            BaseQuantity {
-                unit: self.unit,
-                value: lhs_converted,
-            }
-        } else {
-            panic!("THESE UNITS CANNOT BE ADDED")
-        }
-    }
 }
 
 macro_rules! create_base_unit {
