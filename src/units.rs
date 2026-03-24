@@ -1,5 +1,8 @@
 use fmtastic::Superscript;
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    ops::{Add, Div, Mul, Sub},
+    process::Output,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BaseDimension {
@@ -69,6 +72,21 @@ pub struct BaseUnit {
     pub conversion_factor: f64,
 }
 
+pub trait UnitLike {
+    fn as_unit(self) -> Unit;
+}
+
+impl UnitLike for BaseUnit {
+    fn as_unit(self) -> Unit {
+        Unit {
+            base_units: vec![ImplBaseUnit {
+                base_unit: self,
+                exponent: 1,
+            }],
+        }
+    }
+}
+
 impl Mul for BaseUnit {
     type Output = Unit;
     fn mul(self, rhs: Self) -> Self::Output {
@@ -114,6 +132,23 @@ impl Mul<BaseUnit> for f64 {
     type Output = Quantity;
     fn mul(self, rhs: BaseUnit) -> Self::Output {
         rhs * self
+    }
+}
+
+impl Div<BaseUnit> for BaseUnit {
+    type Output = Unit;
+    fn div(self, rhs: BaseUnit) -> Self::Output {
+        let numerator = ImplBaseUnit {
+            base_unit: self,
+            exponent: 1,
+        };
+        let denominator = ImplBaseUnit {
+            base_unit: rhs,
+            exponent: -1,
+        };
+        Unit {
+            base_units: vec![numerator, denominator],
+        }
     }
 }
 
@@ -170,6 +205,33 @@ impl Unit {
     }
 }
 
+impl Mul<Unit> for Unit {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Mul<BaseUnit> for Unit {
+    type Output = Self;
+    fn mul(self, rhs: BaseUnit) -> Self::Output {
+        self * rhs.as_unit()
+    }
+}
+
+impl Mul<Unit> for BaseUnit {
+    type Output = Unit;
+    fn mul(self, rhs: Unit) -> Self::Output {
+        self.as_unit() * rhs
+    }
+}
+
+impl UnitLike for Unit {
+    fn as_unit(self) -> Unit {
+        self
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Quantity {
     pub unit: Unit,
@@ -177,7 +239,7 @@ pub struct Quantity {
 }
 
 impl Quantity {
-    fn to(self, unit: Unit) -> Quantity {
+    fn to(self, unit: impl UnitLike) -> Quantity {
         todo!()
     }
 }
@@ -272,13 +334,6 @@ create_length_unit!(FEMTOMETER, "fm", 1e-15);
 create_length_unit!(ATTOMETER, "am", 1e-18);
 create_length_unit!(ZEPTOMETER, "zm", 1e-21);
 create_length_unit!(YOCTOMETER, "ym", 1e-24);
-
-pub static meter: Unit = Unit {
-    base_units: vec![ImplBaseUnit {
-        base_unit: METER,
-        exponent: 1,
-    }],
-};
 
 // Imperial Length Units
 create_length_unit!(TWIP, "twip", 0.000017638888888);
@@ -402,16 +457,15 @@ mod tests {
         let distance_b = 500. * METER;
         let distance_c = CENTIMETER * 500.;
         let test_distance = distance_a - distance_b - distance_c;
-        let test_distance_meters = test_distance.to(METER);
+        let test_distance_meters = test_distance.clone().to(METER);
         assert_eq!(test_distance.value, 4.495);
         assert_eq!(test_distance_meters.value, 4495.);
     }
 
     #[test]
     fn test_printing_derived_units() {
-        let a = vec![METER, METER, SECOND, KILOMETER];
-        let b = concatenate_unit_strings(a);
-        println!("{b}");
+        let unit = METER * METER * SECOND * KILOMETER;
+        println!("{}", unit.get_unit_string());
         panic!()
     }
 
@@ -419,9 +473,9 @@ mod tests {
     fn test_derived_units() {
         let x = 5. * KILOMETER;
         let y = 10. * SECOND;
-        let somethign = x * y;
         let velocity = x / y;
-        let velocity_mh = velocity.to(METER / HOUR);
+        let velocity_mh = velocity.clone().to(METER / HOUR);
         assert_eq!(velocity.value, 0.5);
+        assert_eq!(velocity_mh.value, 1799998.56)
     }
 }
