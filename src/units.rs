@@ -1,8 +1,5 @@
 use fmtastic::Superscript;
-use std::{
-    collections::HashMap,
-    ops::{Add, Div, Mul, Sub},
-};
+use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BaseDimension {
@@ -72,43 +69,143 @@ pub struct BaseUnit {
     pub conversion_factor: f64,
 }
 
+impl Mul for BaseUnit {
+    type Output = Unit;
+    fn mul(self, rhs: Self) -> Self::Output {
+        if self == rhs {
+            let impl_unit = ImplBaseUnit {
+                base_unit: self,
+                exponent: 2,
+            };
+            Unit {
+                base_units: vec![impl_unit],
+            }
+        } else {
+            let impl_unit_1 = ImplBaseUnit {
+                base_unit: self,
+                exponent: 1,
+            };
+            let impl_unit_2 = ImplBaseUnit {
+                base_unit: rhs,
+                exponent: 1,
+            };
+            Unit {
+                base_units: vec![impl_unit_1, impl_unit_2],
+            }
+        }
+    }
+}
+
+impl Mul<f64> for BaseUnit {
+    type Output = Quantity;
+    fn mul(self, rhs: f64) -> Self::Output {
+        let implemented_unit = ImplBaseUnit {
+            base_unit: self,
+            exponent: 1,
+        };
+        let unit: Unit = Unit {
+            base_units: vec![implemented_unit],
+        };
+        Quantity { unit, value: rhs }
+    }
+}
+
+impl Mul<BaseUnit> for f64 {
+    type Output = Quantity;
+    fn mul(self, rhs: BaseUnit) -> Self::Output {
+        rhs * self
+    }
+}
+
+impl Div<f64> for BaseUnit {
+    type Output = Quantity;
+    fn div(self, rhs: f64) -> Self::Output {
+        let impl_unit = ImplBaseUnit {
+            base_unit: self,
+            exponent: 1,
+        };
+        let unit = Unit {
+            base_units: vec![impl_unit],
+        };
+        Quantity {
+            unit,
+            value: 1. / rhs,
+        }
+    }
+}
+impl Div<BaseUnit> for f64 {
+    type Output = Quantity;
+    fn div(self, rhs: BaseUnit) -> Self::Output {
+        let impl_unit = ImplBaseUnit {
+            base_unit: rhs,
+            exponent: -1,
+        };
+        let unit = Unit {
+            base_units: vec![impl_unit],
+        };
+        Quantity { unit, value: self }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ImplBaseUnit {
     pub base_unit: BaseUnit,
     pub exponent: i32,
 }
 
-#[derive(Debug)]
-pub struct Unit<'a> {
-    pub base_units: &'a mut Vec<ImplBaseUnit>,
+#[derive(Debug, Clone)]
+pub struct Unit {
+    pub base_units: Vec<ImplBaseUnit>,
 }
 
-impl Unit<'_> {
+impl Unit {
     pub fn get_units_list(&self) -> Vec<BaseUnit> {
         self.base_units.iter().map(|iu| iu.base_unit).collect()
     }
-
-    pub fn push(self, unit: ImplBaseUnit) {
-        let unit_list = self.get_units_list();
-        if unit_list.contains(&unit.base_unit) {
-            for iu in self.base_units {
-                if iu.base_unit == unit.base_unit {
-                    *iu = ImplBaseUnit {
-                        base_unit: iu.base_unit,
-                        exponent: iu.exponent + 1,
-                    }
-                }
-            }
-        } else {
-            self.base_units.push(unit);
-        }
+    pub fn get_unit_string(self) -> String {
+        todo!()
+    }
+    pub fn do_dim_analysis(self) -> Vec<Dimension> {
+        todo!()
     }
 }
 
-#[derive(Debug)]
-pub struct Quantity<'a> {
-    pub unit: Unit<'a>,
+#[derive(Debug, Clone)]
+pub struct Quantity {
+    pub unit: Unit,
     pub value: f64,
+}
+
+impl Quantity {
+    fn to(self, unit: Unit) -> Quantity {
+        todo!()
+    }
+}
+
+impl Add for Quantity {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+impl Sub for Quantity {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+
+impl Mul for Quantity {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
+}
+impl Div for Quantity {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        todo!()
+    }
 }
 
 macro_rules! create_base_unit {
@@ -175,6 +272,13 @@ create_length_unit!(FEMTOMETER, "fm", 1e-15);
 create_length_unit!(ATTOMETER, "am", 1e-18);
 create_length_unit!(ZEPTOMETER, "zm", 1e-21);
 create_length_unit!(YOCTOMETER, "ym", 1e-24);
+
+pub static meter: Unit = Unit {
+    base_units: vec![ImplBaseUnit {
+        base_unit: METER,
+        exponent: 1,
+    }],
+};
 
 // Imperial Length Units
 create_length_unit!(TWIP, "twip", 0.000017638888888);
@@ -286,7 +390,7 @@ mod tests {
         let distance_a = 5. * METER;
         let distance_b = 2. * METER;
         let meter_distance = distance_a + distance_b;
-        let km_distance = meter_distance.to(KILOMETER);
+        let km_distance = meter_distance.clone().to(KILOMETER);
         let distance = 5. * METER + 1. * KILOMETER;
         assert_eq!(distance.value, 1005.);
         assert_eq!(meter_distance.value, 7.);
