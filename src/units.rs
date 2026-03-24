@@ -1,8 +1,5 @@
 use fmtastic::Superscript;
-use std::{
-    ops::{Add, Div, Mul, Sub},
-    process::Output,
-};
+use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BaseDimension {
@@ -73,14 +70,22 @@ pub struct BaseUnit {
 }
 
 pub trait UnitLike {
-    fn as_unit(self) -> Unit;
+    fn as_unit(&self) -> Unit;
+
+    fn calculate_conversion_factor(&self) -> f64 {
+        self.as_unit()
+            .base_units
+            .iter()
+            .map(|iu| iu.base_unit.conversion_factor.powi(iu.exponent))
+            .fold(1., |acc, x| acc + x)
+    }
 }
 
 impl UnitLike for BaseUnit {
-    fn as_unit(self) -> Unit {
+    fn as_unit(&self) -> Unit {
         Unit {
             base_units: vec![ImplBaseUnit {
-                base_unit: self,
+                base_unit: *self,
                 exponent: 1,
             }],
         }
@@ -227,8 +232,8 @@ impl Mul<Unit> for BaseUnit {
 }
 
 impl UnitLike for Unit {
-    fn as_unit(self) -> Unit {
-        self
+    fn as_unit(&self) -> Unit {
+        self.clone()
     }
 }
 
@@ -239,8 +244,13 @@ pub struct Quantity {
 }
 
 impl Quantity {
-    fn to(self, unit: impl UnitLike) -> Quantity {
-        todo!()
+    fn to(self, target_unit: impl UnitLike) -> Quantity {
+        Quantity {
+            unit: target_unit.as_unit(),
+            value: self.value
+                * (self.unit.calculate_conversion_factor()
+                    / target_unit.calculate_conversion_factor()),
+        }
     }
 }
 
