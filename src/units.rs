@@ -187,13 +187,13 @@ impl Div<BaseUnit> for f64 {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImplBaseUnit {
     pub base_unit: BaseUnit,
     pub exponent: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Unit {
     pub base_units: Vec<ImplBaseUnit>,
 }
@@ -257,13 +257,25 @@ impl Quantity {
 impl Add for Quantity {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        todo!()
+        let new_value = (self.value * self.unit.calculate_conversion_factor()
+            + rhs.value * self.unit.calculate_conversion_factor())
+            / self.unit.calculate_conversion_factor();
+        Quantity {
+            unit: self.unit.clone(),
+            value: new_value,
+        }
     }
 }
 impl Sub for Quantity {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        todo!()
+        let new_value = (self.value * self.unit.calculate_conversion_factor()
+            - rhs.value * self.unit.calculate_conversion_factor())
+            / self.unit.calculate_conversion_factor();
+        Quantity {
+            unit: self.unit.clone(),
+            value: new_value,
+        }
     }
 }
 
@@ -346,6 +358,7 @@ create_length_unit!(ZEPTOMETER, "zm", 1e-21);
 create_length_unit!(YOCTOMETER, "ym", 1e-24);
 
 // Imperial Length Units
+
 create_length_unit!(TWIP, "twip", 0.000017638888888);
 create_length_unit!(THOU, "th", 0.0000254);
 create_length_unit!(BARLEYCORN, "barelycorn", 0.008466666666);
@@ -372,6 +385,7 @@ create_length_unit!(MEGA_PARSEC, "Mpc", 1e6 * 3.09e16);
 create_length_unit!(GIGA_PARSEC, "Gpc", 1e9 * 3.09e16);
 
 // Metric Mass Units
+
 create_mass_unit!(YOTTAGRAM, "Yg", 1e24);
 create_mass_unit!(ZETTAGRAM, "Zg", 1e21);
 create_mass_unit!(EXAGRAM, "Eg", 1e18);
@@ -450,6 +464,15 @@ create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_making_quantities() {
+        let distance_a = 5. * METER;
+        let distance_b = 2. * METER;
+        let meter_distance = distance_a + distance_b;
+
+        assert_eq!(meter_distance.value, 7.);
+        assert_eq!(meter_distance.unit, METER.as_unit())
+    }
     #[test]
     fn test_adding_and_converting_units() {
         let distance_a = 5. * METER;
