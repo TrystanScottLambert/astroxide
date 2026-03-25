@@ -10,7 +10,7 @@ pub enum BaseDimension {
     UNITLESS,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Dimension {
     pub base: BaseDimension,
     pub exponent: i32,
@@ -62,7 +62,7 @@ impl Div for Dimension {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BaseUnit {
     pub base_dimension: Dimension,
     pub symbol: &'static str,
@@ -187,25 +187,31 @@ impl Div<BaseUnit> for f64 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ImplBaseUnit {
     pub base_unit: BaseUnit,
     pub exponent: i32,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Unit {
     pub base_units: Vec<ImplBaseUnit>,
+}
+
+impl PartialEq for Unit {
+    fn eq(&self, other: &Self) -> bool {
+        self.get_unit_string() == other.get_unit_string()
+    }
 }
 
 impl Unit {
     pub fn get_units_list(&self) -> Vec<BaseUnit> {
         self.base_units.iter().map(|iu| iu.base_unit).collect()
     }
-    pub fn get_unit_string(self) -> String {
+    pub fn get_unit_string(&self) -> String {
         todo!()
     }
-    pub fn do_dim_analysis(self) -> Vec<Dimension> {
+    pub fn do_dim_analysis(&self) -> Vec<Dimension> {
         todo!()
     }
 }
@@ -213,13 +219,32 @@ impl Unit {
 impl Mul<Unit> for Unit {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
-        let base_unit_list = self.get_units_list();
-        let new_base_units = Vec::new();
-        for unit in base_unit_list {
-            if !base_unit_list.contains(&unit) {
-                new_base_units.push(unit);
-            } else {
+        let mut new_impl_units = Vec::new();
+        let self_base_units = self.get_units_list();
+        let rhs_base_unit_list = rhs.get_units_list();
+
+        for (i, base_unit) in self_base_units.iter().enumerate() {
+            if !rhs_base_unit_list.contains(base_unit) {
+                new_impl_units.push(*self.base_units.get(i).unwrap())
             }
+        }
+
+        for impl_unit in rhs.base_units {
+            if self_base_units.contains(&impl_unit.base_unit) {
+                for iu in self.base_units.clone() {
+                    if iu.base_unit == impl_unit.base_unit {
+                        new_impl_units.push(ImplBaseUnit {
+                            base_unit: iu.base_unit,
+                            exponent: iu.exponent + impl_unit.exponent,
+                        })
+                    }
+                }
+            } else {
+                new_impl_units.push(impl_unit);
+            }
+        }
+        Unit {
+            base_units: new_impl_units,
         }
     }
 }
@@ -521,35 +546,58 @@ mod tests {
         assert_eq!(result, 1000.);
     }
     #[test]
+    fn test_unit_equality() {
+        //test that order doens't matter and that unts are actually equal
+        let a = METER * METER;
+        let b = METER * KILOMETER;
+        let c = KILOMETER * KILOMETER;
+        let d = KILOMETER * KILOMETER;
+        let e = METER * METER;
+        assert_eq!(a, e);
+        assert_eq!(c, d);
+        assert_ne!(b, a);
+        assert_ne!(a, c);
+
+        let a = METER * KILOMETER;
+        let b = KILOMETER * METER;
+        assert_eq!(a, b);
+    }
+    #[test]
     fn test_multiplying_unit() {
         let a = METER * METER; // base unit
         let b = METER * METER * METER; // unit * base_unit
-        let answer_a = vec![
-            ImplBaseUnit {
+        let c = METER * KILOMETER * SECOND * KILOMETER;
+        let answer_a = Unit {
+            base_units: vec![ImplBaseUnit {
                 base_unit: METER,
-                exponent: 1,
-            },
-            ImplBaseUnit {
+                exponent: 2,
+            }],
+        };
+        let answer_b = Unit {
+            base_units: vec![ImplBaseUnit {
                 base_unit: METER,
-                exponent: 1,
-            },
-        ];
-        let answer_b = vec![
-            ImplBaseUnit {
-                base_unit: METER,
-                exponent: 1,
-            },
-            ImplBaseUnit {
-                base_unit: METER,
-                exponent: 1,
-            },
-            ImplBaseUnit {
-                base_unit: METER,
-                exponent: 1,
-            },
-        ];
-        assert_eq!(a.base_units, answer_a);
-        assert_eq!(b.base_units, answer_b);
+                exponent: 3,
+            }],
+        };
+        let answer_c = Unit {
+            base_units: vec![
+                ImplBaseUnit {
+                    base_unit: METER,
+                    exponent: 1,
+                },
+                ImplBaseUnit {
+                    base_unit: SECOND,
+                    exponent: 1,
+                },
+                ImplBaseUnit {
+                    base_unit: KILOMETER,
+                    exponent: 2,
+                },
+            ],
+        };
+        assert_eq!(a, answer_a);
+        assert_eq!(b, answer_b);
+        assert_eq!(c, answer_c);
     }
 
     #[test]
