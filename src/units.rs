@@ -10,7 +10,7 @@ pub enum BaseDimension {
     UNITLESS,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Dimension {
     pub base: BaseDimension,
     pub exponent: i32,
@@ -62,7 +62,7 @@ impl Div for Dimension {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BaseUnit {
     pub base_dimension: Dimension,
     pub symbol: &'static str,
@@ -77,7 +77,7 @@ pub trait UnitLike {
             .base_units
             .iter()
             .map(|iu| iu.base_unit.conversion_factor.powi(iu.exponent))
-            .fold(1., |acc, x| acc + x)
+            .fold(1., |acc, x| acc * x)
     }
 }
 
@@ -187,7 +187,7 @@ impl Div<BaseUnit> for f64 {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ImplBaseUnit {
     pub base_unit: BaseUnit,
     pub exponent: i32,
@@ -213,6 +213,20 @@ impl Unit {
 impl Mul<Unit> for Unit {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
+        let base_unit_list = self.get_units_list();
+        let new_base_units = Vec::new();
+        for unit in base_unit_list {
+            if !base_unit_list.contains(&unit) {
+                new_base_units.push(unit);
+            } else {
+            }
+        }
+    }
+}
+
+impl Div<Unit> for Unit {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
         todo!()
     }
 }
@@ -244,7 +258,7 @@ pub struct Quantity {
 }
 
 impl Quantity {
-    fn to(self, target_unit: impl UnitLike) -> Quantity {
+    pub fn to(self, target_unit: impl UnitLike) -> Quantity {
         Quantity {
             unit: target_unit.as_unit(),
             value: self.value
@@ -258,8 +272,11 @@ impl Add for Quantity {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         let new_value = (self.value * self.unit.calculate_conversion_factor()
-            + rhs.value * self.unit.calculate_conversion_factor())
+            + rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
+        dbg!(&new_value);
+        dbg!(&rhs.value);
+        dbg!(&rhs.unit.calculate_conversion_factor());
         Quantity {
             unit: self.unit.clone(),
             value: new_value,
@@ -279,16 +296,50 @@ impl Sub for Quantity {
     }
 }
 
-impl Mul for Quantity {
+impl Mul<Quantity> for Quantity {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
         todo!()
     }
 }
-impl Div for Quantity {
+
+impl Div<Quantity> for Quantity {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
         todo!()
+    }
+}
+
+impl Mul<BaseUnit> for Quantity {
+    type Output = Quantity;
+    fn mul(self, rhs: BaseUnit) -> Self::Output {
+        let new_unit = self.unit * rhs.as_unit();
+        Quantity {
+            value: self.value,
+            unit: new_unit,
+        }
+    }
+}
+impl Mul<Quantity> for BaseUnit {
+    type Output = Quantity;
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        rhs * self
+    }
+}
+impl Div<BaseUnit> for Quantity {
+    type Output = Quantity;
+    fn div(self, rhs: BaseUnit) -> Self::Output {
+        let new_unit = self.unit / rhs.as_unit();
+        Quantity {
+            value: self.value,
+            unit: new_unit,
+        }
+    }
+}
+impl Div<Quantity> for BaseUnit {
+    type Output = Quantity;
+    fn div(self, rhs: Quantity) -> Self::Output {
+        rhs / self
     }
 }
 
@@ -463,16 +514,66 @@ create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn test_unit_factor() {
+        let a = 5. * KILOMETER;
+        let result = a.unit.calculate_conversion_factor();
+        assert_eq!(result, 1000.);
+    }
+    #[test]
+    fn test_multiplying_unit() {
+        let a = METER * METER; // base unit
+        let b = METER * METER * METER; // unit * base_unit
+        let answer_a = vec![
+            ImplBaseUnit {
+                base_unit: METER,
+                exponent: 1,
+            },
+            ImplBaseUnit {
+                base_unit: METER,
+                exponent: 1,
+            },
+        ];
+        let answer_b = vec![
+            ImplBaseUnit {
+                base_unit: METER,
+                exponent: 1,
+            },
+            ImplBaseUnit {
+                base_unit: METER,
+                exponent: 1,
+            },
+            ImplBaseUnit {
+                base_unit: METER,
+                exponent: 1,
+            },
+        ];
+        assert_eq!(a.base_units, answer_a);
+        assert_eq!(b.base_units, answer_b);
+    }
 
     #[test]
     fn test_making_quantities() {
         let distance_a = 5. * METER;
         let distance_b = 2. * METER;
-        let meter_distance = distance_a + distance_b;
+        let distance_c = 3. * KILOMETER;
+        let meter_distance = distance_a.clone() + distance_b;
+        let another_distance = distance_a + distance_c;
 
         assert_eq!(meter_distance.value, 7.);
-        assert_eq!(meter_distance.unit, METER.as_unit())
+        assert_eq!(meter_distance.unit, METER.as_unit());
+        assert_eq!(another_distance.value, 3005.);
+        assert_eq!(another_distance.unit, METER.as_unit());
     }
+    #[test]
+    fn zero_quantity() {
+        let a = 5. * METER;
+        let b = 0. * METER;
+        let c = a + b;
+        assert_eq!(c.value, 5.);
+        assert_eq!(c.unit, METER.as_unit());
+    }
+
     #[test]
     fn test_adding_and_converting_units() {
         let distance_a = 5. * METER;
