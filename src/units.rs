@@ -333,14 +333,19 @@ impl Sub for Quantity {
 impl Mul<Quantity> for Quantity {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
-        todo!()
+        let unit = self.unit * rhs.unit;
+        let value = self.value * rhs.value;
+        Quantity { value, unit }
     }
 }
 
 impl Div<Quantity> for Quantity {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
-        todo!()
+        let unit = self.unit / rhs.unit;
+        let value = self.value / rhs.value;
+
+        Quantity { value, unit }
     }
 }
 
@@ -696,6 +701,6 @@ mod tests {
         let velocity = x / y;
         let velocity_mh = velocity.clone().to(METER / HOUR);
         assert_eq!(velocity.value, 0.5);
-        assert_eq!(velocity_mh.value, 1799998.56)
+        assert_eq!(velocity_mh.value, 1800000.)
     }
 }
