@@ -201,7 +201,7 @@ impl Unit {
 fn clean_up_zero_exponents(units: Vec<ImplBaseUnit>) -> Vec<ImplBaseUnit> {
     let mut new_vec = Vec::new();
     for iu in units {
-        if iu.exponent != 0 {
+        if iu.exponent != 0 && iu.base_unit != UNITLESS {
             new_vec.push(iu);
         }
     }
