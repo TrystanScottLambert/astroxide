@@ -200,7 +200,17 @@ pub struct Unit {
 
 impl PartialEq for Unit {
     fn eq(&self, other: &Self) -> bool {
-        self.get_unit_string() == other.get_unit_string()
+        for iu in self.base_units.clone() {
+            if !other.base_units.contains(&iu) {
+                return false;
+            }
+        }
+        for iu in other.base_units.clone() {
+            if !self.base_units.contains(&iu) {
+                return false;
+            }
+        }
+        true
     }
 }
 
@@ -208,10 +218,10 @@ impl Unit {
     pub fn get_units_list(&self) -> Vec<BaseUnit> {
         self.base_units.iter().map(|iu| iu.base_unit).collect()
     }
-    pub fn get_unit_string(&self) -> String {
+    pub fn get_unit_string(self) -> String {
         todo!()
     }
-    pub fn do_dim_analysis(&self) -> Vec<Dimension> {
+    pub fn do_dim_analysis(self) -> Vec<Dimension> {
         todo!()
     }
 }
@@ -252,7 +262,17 @@ impl Mul<Unit> for Unit {
 impl Div<Unit> for Unit {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
-        todo!()
+        let denominator_base_units = rhs
+            .base_units
+            .iter()
+            .map(|iu| ImplBaseUnit {
+                base_unit: iu.base_unit,
+                exponent: -iu.exponent,
+            })
+            .collect();
+        self * Unit {
+            base_units: denominator_base_units,
+        }
     }
 }
 
