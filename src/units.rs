@@ -1,6 +1,13 @@
 use fmtastic::Superscript;
 use std::ops::{Add, Div, Mul, Sub};
 
+pub type Result<T> = core::result::Result<T, UnitError>;
+
+#[derive(Debug, Clone)]
+pub enum UnitError {
+    DifferentDimensions(Vec<Dimension>, Vec<Dimension>),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BaseDimension {
     LENGTH,
@@ -201,7 +208,7 @@ impl Unit {
         let string_reprs: Vec<String> = self.base_units.iter().map(|iu| iu.string_repr()).collect();
         string_reprs.join(" ")
     }
-    pub fn do_dim_analysis(self) -> Vec<Dimension> {
+    pub fn dimensions(self) -> Vec<Dimension> {
         todo!()
     }
 }
@@ -313,30 +320,43 @@ impl Quantity {
 }
 
 impl Add for Quantity {
-    type Output = Self;
+    type Output = Result<Self>;
     fn add(self, rhs: Self) -> Self::Output {
+        let self_dimensions = self.unit.clone().dimensions();
+        let rhs_dimensions = rhs.unit.clone().dimensions();
+        if self_dimensions != rhs_dimensions {
+            return Err(UnitError::DifferentDimensions(
+                self_dimensions,
+                rhs_dimensions,
+            ));
+        }
         let new_value = (self.value * self.unit.calculate_conversion_factor()
             + rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
-        dbg!(&new_value);
-        dbg!(&rhs.value);
-        dbg!(&rhs.unit.calculate_conversion_factor());
-        Quantity {
+        Ok(Quantity {
             unit: self.unit.clone(),
             value: new_value,
-        }
+        })
     }
 }
 impl Sub for Quantity {
-    type Output = Self;
+    type Output = Result<Self>;
     fn sub(self, rhs: Self) -> Self::Output {
+        let self_dimensions = self.unit.clone().dimensions();
+        let rhs_dimensions = rhs.unit.clone().dimensions();
+        if self_dimensions != rhs_dimensions {
+            return Err(UnitError::DifferentDimensions(
+                self_dimensions,
+                rhs_dimensions,
+            ));
+        }
         let new_value = (self.value * self.unit.calculate_conversion_factor()
             - rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
-        Quantity {
+        Ok(Quantity {
             unit: self.unit.clone(),
             value: new_value,
-        }
+        })
     }
 }
 
@@ -564,6 +584,8 @@ create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
 mod tests {
     use core::panic;
 
+    use kiddo::fixed::distance;
+
     use super::*;
     #[test]
     fn test_unit_factor() {
@@ -688,6 +710,16 @@ mod tests {
         assert_eq!(meter_distance.value, 7.);
         assert_eq!(km_distance.value, 0.007);
     }
+
+    #[test]
+    fn test_adding_and_subtracting_non_equivalent_units_fails() {
+        let distance = 4. * METER;
+        let time = 3. * HOUR;
+        let thing = distance + time;
+        dbg!(&thing);
+        assert_eq!(thing.value, 8.)
+    }
+
     #[test]
     fn test_subtracting_units() {
         let distance_a = 5. * KILOMETER;
