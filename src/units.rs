@@ -162,6 +162,15 @@ pub struct ImplBaseUnit {
     pub base_unit: BaseUnit,
     pub exponent: i32,
 }
+impl ImplBaseUnit {
+    pub fn string_repr(&self) -> String {
+        match self.exponent {
+            0 => String::new(),
+            1 => self.base_unit.symbol.to_string(),
+            _ => format!("{}{}", self.base_unit.symbol, Superscript(self.exponent)),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Unit {
@@ -189,7 +198,8 @@ impl Unit {
         self.base_units.iter().map(|iu| iu.base_unit).collect()
     }
     pub fn get_unit_string(self) -> String {
-        todo!()
+        let string_reprs: Vec<String> = self.base_units.iter().map(|iu| iu.string_repr()).collect();
+        string_reprs.join(" ")
     }
     pub fn do_dim_analysis(self) -> Vec<Dimension> {
         todo!()
@@ -321,7 +331,7 @@ impl Sub for Quantity {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
         let new_value = (self.value * self.unit.calculate_conversion_factor()
-            - rhs.value * self.unit.calculate_conversion_factor())
+            - rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
         Quantity {
             unit: self.unit.clone(),
@@ -552,6 +562,8 @@ create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
 
 #[cfg(test)]
 mod tests {
+    use core::panic;
+
     use super::*;
     #[test]
     fn test_unit_factor() {
@@ -689,9 +701,22 @@ mod tests {
 
     #[test]
     fn test_printing_derived_units() {
-        let unit = METER * METER * SECOND * KILOMETER;
-        println!("{}", unit.get_unit_string());
-        panic!()
+        let unit = METER * SECOND * KILOMETER * METER;
+        let answer = String::from("m² s km");
+        let result = unit.get_unit_string();
+        let mut answer_strings: Vec<&str> = answer.split(" ").collect();
+        let mut result_strings: Vec<&str> = result.split(" ").collect();
+        answer_strings.sort();
+        result_strings.sort();
+        assert_eq!(answer_strings, result_strings)
+    }
+    #[test]
+    fn test_impl_string_repr() {
+        let a = ImplBaseUnit {
+            base_unit: MEGA_PARSEC,
+            exponent: 2,
+        };
+        assert_eq!(a.string_repr(), String::from("Mpc²"))
     }
 
     #[test]
