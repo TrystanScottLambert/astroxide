@@ -95,27 +95,7 @@ impl UnitLike for BaseUnit {
 impl Mul for BaseUnit {
     type Output = Unit;
     fn mul(self, rhs: Self) -> Self::Output {
-        if self == rhs {
-            let impl_unit = ImplBaseUnit {
-                base_unit: self,
-                exponent: 2,
-            };
-            Unit {
-                base_units: vec![impl_unit],
-            }
-        } else {
-            let impl_unit_1 = ImplBaseUnit {
-                base_unit: self,
-                exponent: 1,
-            };
-            let impl_unit_2 = ImplBaseUnit {
-                base_unit: rhs,
-                exponent: 1,
-            };
-            Unit {
-                base_units: vec![impl_unit_1, impl_unit_2],
-            }
-        }
+        self.as_unit() * rhs.as_unit()
     }
 }
 
@@ -143,17 +123,7 @@ impl Mul<BaseUnit> for f64 {
 impl Div<BaseUnit> for BaseUnit {
     type Output = Unit;
     fn div(self, rhs: BaseUnit) -> Self::Output {
-        let numerator = ImplBaseUnit {
-            base_unit: self,
-            exponent: 1,
-        };
-        let denominator = ImplBaseUnit {
-            base_unit: rhs,
-            exponent: -1,
-        };
-        Unit {
-            base_units: vec![numerator, denominator],
-        }
+        self.as_unit() / rhs.as_unit()
     }
 }
 
@@ -226,6 +196,25 @@ impl Unit {
     }
 }
 
+// Helper function to iterate over the implemented units and remove any that
+// have zero in the exponents. If there is nothing left then it returns UNITLESS
+fn clean_up_zero_exponents(units: Vec<ImplBaseUnit>) -> Vec<ImplBaseUnit> {
+    let mut new_vec = Vec::new();
+    for iu in units {
+        if iu.exponent != 0 {
+            new_vec.push(iu);
+        }
+    }
+    if new_vec.is_empty() {
+        vec![ImplBaseUnit {
+            base_unit: UNITLESS,
+            exponent: 0,
+        }]
+    } else {
+        new_vec
+    }
+}
+
 impl Mul<Unit> for Unit {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
@@ -254,7 +243,7 @@ impl Mul<Unit> for Unit {
             }
         }
         Unit {
-            base_units: new_impl_units,
+            base_units: clean_up_zero_exponents(new_impl_units),
         }
     }
 }
@@ -618,6 +607,35 @@ mod tests {
         assert_eq!(a, answer_a);
         assert_eq!(b, answer_b);
         assert_eq!(c, answer_c);
+    }
+
+    #[test]
+    fn test_dividing_units() {
+        let a = METER;
+        let b = METER;
+        let c = a / b;
+        assert_eq!(
+            c.base_units,
+            vec![ImplBaseUnit {
+                base_unit: UNITLESS,
+                exponent: 0,
+            }]
+        );
+
+        let a = METER;
+        let b = SECOND;
+        let c = a / b;
+        let answer_simple = vec![
+            ImplBaseUnit {
+                base_unit: METER,
+                exponent: 1,
+            },
+            ImplBaseUnit {
+                base_unit: SECOND,
+                exponent: -1,
+            },
+        ];
+        assert_eq!(c.base_units, answer_simple);
     }
 
     #[test]
