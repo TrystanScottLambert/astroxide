@@ -1,4 +1,5 @@
 use fmtastic::Superscript;
+use paste::paste;
 use std::ops::{Add, Div, Mul, Sub};
 
 pub type Result<T> = core::result::Result<T, UnitError>;
@@ -575,30 +576,45 @@ macro_rules! create_temperature_unit {
     };
 }
 
-create_length_unit!(YOTTAMETER, "Ym", 1e24);
-create_length_unit!(ZETTAMETER, "Zm", 1e21);
-create_length_unit!(EXAMETER, "Em", 1e18);
-create_length_unit!(PETAMETER, "Pm", 1e15);
-create_length_unit!(TERAMETER, "Tm", 1e12);
-create_length_unit!(GIGAMETER, "Gm", 1e9);
-create_length_unit!(MEGAMETER, "Mm", 1e6);
-create_length_unit!(KILOMETER, "km", 1e3);
-create_length_unit!(HECTOMETER, "hm", 1e2);
-create_length_unit!(DEKAMETER, "dam", 1e1);
-create_length_unit!(METER, "m", 1.);
-create_length_unit!(DECIMETER, "dm", 1e-1);
-create_length_unit!(CENTIMETER, "cm", 1e-2);
-create_length_unit!(MILLIMETER, "mm", 1e-3);
-create_length_unit!(MICROMETER, "μm", 1e-6);
-create_length_unit!(NANOMETER, "nm", 1e-9);
-create_length_unit!(PICOMETER, "pm", 1e-12);
-create_length_unit!(FEMTOMETER, "fm", 1e-15);
-create_length_unit!(ATTOMETER, "am", 1e-18);
-create_length_unit!(ZEPTOMETER, "zm", 1e-21);
-create_length_unit!(YOCTOMETER, "ym", 1e-24);
+macro_rules! si {
+    ($base_unit: ident, $base_symbol: expr, $base_conversion: expr, $create_macro: ident) => {
+        paste! {
+            $create_macro!([<QUETTA $base_unit>], concat!("Q", $base_symbol), 1e30*$base_conversion);
+            $create_macro!([<RONNA $base_unit>], concat!("R", $base_symbol), 1e27*$base_conversion);
+            $create_macro!([<YOTTA $base_unit>], concat!("Y", $base_symbol), 1e24*$base_conversion);
+            $create_macro!([<ZETTA $base_unit>], concat!("Z", $base_symbol), 1e21*$base_conversion);
+            $create_macro!([<EXA $base_unit>], concat!("E", $base_symbol), 1e18*$base_conversion);
+            $create_macro!([<PETA $base_unit>], concat!("P", $base_symbol), 1e15*$base_conversion);
+            $create_macro!([<TERA $base_unit>], concat!("T", $base_symbol), 1e12*$base_conversion);
+            $create_macro!([<GIGA $base_unit>], concat!("G", $base_symbol), 1e9*$base_conversion);
+            $create_macro!([<MEGA $base_unit>], concat!("M", $base_symbol), 1e6*$base_conversion);
+            $create_macro!([<KILO $base_unit>], concat!("k", $base_symbol), 1e3*$base_conversion);
+            $create_macro!([<HECTO $base_unit>], concat!("h", $base_symbol), 1e2*$base_conversion);
+            $create_macro!([<DECA $base_unit>], concat!("da", $base_symbol), 1e1*$base_conversion);
+            $create_macro!($base_unit, $base_symbol, $base_conversion);
+            $create_macro!([<DECI $base_unit>], concat!("d", $base_symbol), 1e-1*$base_conversion);
+            $create_macro!([<CENTI $base_unit>], concat!("c", $base_symbol), 1e-2*$base_conversion);
+            $create_macro!([<MILLI $base_unit>], concat!("m", $base_symbol), 1e-3*$base_conversion);
+            $create_macro!([<MICRO $base_unit>], concat!("u", $base_symbol), 1e-6*$base_conversion);
+            $create_macro!([<NANO $base_unit>], concat!("n", $base_symbol), 1e-9*$base_conversion);
+            $create_macro!([<PICO $base_unit>], concat!("p", $base_symbol), 1e-12*$base_conversion);
+            $create_macro!([<FEMTO $base_unit>], concat!("f", $base_symbol), 1e-15*$base_conversion);
+            $create_macro!([<ATTO $base_unit>], concat!("a", $base_symbol), 1e-18*$base_conversion);
+            $create_macro!([<ZEPTO $base_unit>], concat!("z", $base_symbol), 1e-21*$base_conversion);
+            $create_macro!([<YOCTO $base_unit>], concat!("y", $base_symbol), 1e-24*$base_conversion);
+            $create_macro!([<RONTO $base_unit>], concat!("r", $base_symbol), 1e-27*$base_conversion);
+            $create_macro!([<QUECTO $base_unit>], concat!("q", $base_symbol), 1e-30*$base_conversion);
+        }
+    };
+}
+
+si!(METER, "m", 1., create_length_unit);
+// Astronomical Length Units
+si!(ASTRONOMICAL_UNIT, "AU", 1.496e11, create_length_unit);
+si!(LIGHTYEAR, "lyr", 9.5e15, create_length_unit);
+si!(PARSEC, "pc", 3.09e16, create_length_unit);
 
 // Imperial Length Units
-
 create_length_unit!(TWIP, "twip", 0.000017638888888);
 create_length_unit!(THOU, "th", 0.0000254);
 create_length_unit!(BARLEYCORN, "barelycorn", 0.008466666666);
@@ -616,89 +632,19 @@ create_length_unit!(NAUTICAL_MILE, "nmi", 185.2);
 create_length_unit!(LINK, "link", 0.201168);
 create_length_unit!(ROD, "rod", 5.0292);
 
-// Astronomical Length Units
-create_length_unit!(ASTRONOMICAL_UNIT, "AU", 1.496e11);
-create_length_unit!(LIGHTYEAR, "lyr", 9.5e15);
-create_length_unit!(PARSEC, "pc", 3.09e16);
-create_length_unit!(KILO_PARSEC, "kpc", 1e3 * 3.09e16);
-create_length_unit!(MEGA_PARSEC, "Mpc", 1e6 * 3.09e16);
-create_length_unit!(GIGA_PARSEC, "Gpc", 1e9 * 3.09e16);
-
-// Metric Mass Units
-
-create_mass_unit!(YOTTAGRAM, "Yg", 1e24);
-create_mass_unit!(ZETTAGRAM, "Zg", 1e21);
-create_mass_unit!(EXAGRAM, "Eg", 1e18);
-create_mass_unit!(PETAGRAM, "Pg", 1e15);
-create_mass_unit!(TERAGRAM, "Tg", 1e12);
-create_mass_unit!(GIGAGRAM, "Gg", 1e9);
-create_mass_unit!(MEGAGRAM, "Mg", 1e6);
-create_mass_unit!(KILOGRAM, "kg", 1e3);
-create_mass_unit!(HECTOGRAM, "hg", 1e2);
-create_mass_unit!(DEKAGRAM, "dag", 1e1);
-create_mass_unit!(GRAM, "g", 1.);
-create_mass_unit!(DECIGRAM, "dg", 1e-1);
-create_mass_unit!(CENTIGRAM, "cg", 1e-2);
-create_mass_unit!(MILLIGRAM, "mg", 1e-3);
-create_mass_unit!(MICROGRAM, "μg", 1e-6);
-create_mass_unit!(NANOGRAM, "ng", 1e-9);
-create_mass_unit!(PICOGRAM, "pg", 1e-12);
-create_mass_unit!(FEMTOGRAM, "fg", 1e-15);
-create_mass_unit!(ATTOGRAM, "ag", 1e-18);
-create_mass_unit!(ZEPTOGRAM, "zg", 1e-21);
-create_mass_unit!(YOCTOGRAM, "yg", 1e-24);
+// Mass
+si!(GRAM, "g", 1., create_mass_unit);
 
 // Astronomical Mass Units
 create_mass_unit!(SOLAR_MASS, "msun", 1.988475e33);
 
-// Metric Time Units
-create_time_unit!(YOTTASECOND, "Ys", 1e24);
-create_time_unit!(ZETTASECOND, "Zs", 1e21);
-create_time_unit!(EXASECOND, "Es", 1e18);
-create_time_unit!(PETASECOND, "Ps", 1e15);
-create_time_unit!(TERASECOND, "Ts", 1e12);
-create_time_unit!(GIGASECOND, "Gs", 1e9);
-create_time_unit!(MEGASECOND, "Ms", 1e6);
-create_time_unit!(KILOSECOND, "ks", 1e3);
-create_time_unit!(HECTOSECOND, "hs", 1e2);
-create_time_unit!(DEKASECOND, "das", 1e1);
-create_time_unit!(SECOND, "s", 1.);
-create_time_unit!(DECISECOND, "ds", 1e-1);
-create_time_unit!(CENTISECOND, "cs", 1e-2);
-create_time_unit!(MILLISECOND, "ms", 1e-3);
-create_time_unit!(MICROSECOND, "μs", 1e-6);
-create_time_unit!(NANOSECOND, "ns", 1e-9);
-create_time_unit!(PICOSECOND, "ps", 1e-12);
-create_time_unit!(FEMTOSECOND, "fs", 1e-15);
-create_time_unit!(ATTOSECOND, "as", 1e-18);
-create_time_unit!(ZEPTOSECOND, "zs", 1e-21);
-create_time_unit!(YOCTOSECOND, "ys", 1e-24);
-
-create_time_unit!(MINUTE, "min", 60.);
-create_time_unit!(HOUR, "hr", 3600.);
+// Time
+si!(SECOND, "s", 1., create_time_unit);
+si!(MINUTE, "min", 60., create_time_unit);
+si!(HOUR, "hr", 3600., create_time_unit);
 
 // Metric Temperature units
-create_temperature_unit!(YOTTAKELVIN, "YK", 1e24);
-create_temperature_unit!(ZETTAKELVIN, "ZK", 1e21);
-create_temperature_unit!(EXAKELVIN, "EK", 1e18);
-create_temperature_unit!(PETAKELVIN, "PK", 1e15);
-create_temperature_unit!(TERAKELVIN, "TK", 1e12);
-create_temperature_unit!(GIGAKELVIN, "GK", 1e9);
-create_temperature_unit!(MEGAKELVIN, "MK", 1e6);
-create_temperature_unit!(KILOKELVIN, "kK", 1e3);
-create_temperature_unit!(HECTOKELVIN, "hK", 1e2);
-create_temperature_unit!(DEKAKELVIN, "daK", 1e1);
-create_temperature_unit!(KELVIN, "K", 1.);
-create_temperature_unit!(DECIKELVIN, "dK", 1e-1);
-create_temperature_unit!(CENTIKELVIN, "cK", 1e-2);
-create_temperature_unit!(MILLIKELVIN, "mK", 1e-3);
-create_temperature_unit!(MICROKELVIN, "μK", 1e-6);
-create_temperature_unit!(NANOKELVIN, "nK", 1e-9);
-create_temperature_unit!(PICOKELVIN, "pK", 1e-12);
-create_temperature_unit!(FEMTOKELVIN, "fK", 1e-15);
-create_temperature_unit!(ATTOKELVIN, "aK", 1e-18);
-create_temperature_unit!(ZEPTOKELVIN, "zK", 1e-21);
-create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
+si!(KELVIN, "K", 1., create_temperature_unit);
 
 #[cfg(test)]
 mod tests {
@@ -873,7 +819,7 @@ mod tests {
     #[test]
     fn test_impl_string_repr() {
         let a = ImplBaseUnit {
-            base_unit: MEGA_PARSEC,
+            base_unit: MEGAPARSEC,
             exponent: 2,
         };
         assert_eq!(a.string_repr(), String::from("Mpc²"))
@@ -891,8 +837,8 @@ mod tests {
 
     #[test]
     fn test_astronomy() {
-        let volume = 3. * (MEGA_PARSEC * MEGA_PARSEC * MEGA_PARSEC);
-        let volume_gpc3 = volume.to(GIGA_PARSEC * GIGA_PARSEC * GIGA_PARSEC).unwrap();
+        let volume = 3. * (MEGAPARSEC * MEGAPARSEC * MEGAPARSEC);
+        let volume_gpc3 = volume.to(GIGAPARSEC * GIGAPARSEC * GIGAPARSEC).unwrap();
         assert!((volume_gpc3.value - 3e-9).abs() < f64::EPSILON);
 
         let speed = 50. * (METER / SECOND);
@@ -900,7 +846,7 @@ mod tests {
         dbg!(&speed_kmh);
         assert!((speed_kmh.value - 180.).abs() < 1e-12);
 
-        let hubble_constant = 70. * (KILOMETER / SECOND) / MEGA_PARSEC;
+        let hubble_constant = 70. * (KILOMETER / SECOND) / MEGAPARSEC;
         let weird_hubble = hubble_constant.to(METER / (KILOMETER * HOUR)).unwrap();
         assert!((weird_hubble.value - 8.16676381e-12).abs() < 1e-12); // comparing to astropyj
     }

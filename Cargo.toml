@@ -10,5 +10,6 @@ license = "MIT"
 fmtastic = "0.2.2"
 kiddo = "5.2.2"
 libm = "0.2.15"
+paste = "1.0.15"
 phf = { version = "0.12.1", features = ["macros"] }
 rayon = "1.11.0"
