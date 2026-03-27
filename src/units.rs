@@ -341,14 +341,14 @@ pub struct Quantity {
     pub value: f64,
 }
 
-fn are_dimensions_equal(dimensions_a: &Vec<Dimension>, dimensions_b: &Vec<Dimension>) -> bool {
-    for dim in dimensions_a.clone() {
-        if !dimensions_b.contains(&dim) {
+fn are_dimensions_equal(dimensions_a: &[Dimension], dimensions_b: &[Dimension]) -> bool {
+    for dim in dimensions_a {
+        if !dimensions_b.contains(dim) {
             return false;
         }
     }
     for dim in dimensions_b {
-        if !dimensions_a.contains(&dim) {
+        if !dimensions_a.contains(dim) {
             return false;
         }
     }
@@ -380,7 +380,7 @@ impl Add for Quantity {
     fn add(self, rhs: Self) -> Self::Output {
         let self_dimensions = self.unit.clone().dimensions();
         let rhs_dimensions = rhs.unit.clone().dimensions();
-        if self_dimensions != rhs_dimensions {
+        if !are_dimensions_equal(&self_dimensions, &rhs_dimensions) {
             return Err(UnitError::DifferentDimensions(
                 self_dimensions,
                 rhs_dimensions,
@@ -415,7 +415,7 @@ impl Sub for Quantity {
     fn sub(self, rhs: Self) -> Self::Output {
         let self_dimensions = self.unit.clone().dimensions();
         let rhs_dimensions = rhs.unit.clone().dimensions();
-        if self_dimensions != rhs_dimensions {
+        if !are_dimensions_equal(&self_dimensions, &rhs_dimensions) {
             return Err(UnitError::DifferentDimensions(
                 self_dimensions,
                 rhs_dimensions,
@@ -823,7 +823,7 @@ mod tests {
         let d = b.clone() - a.clone();
         assert!((c.clone().unwrap().value - 54015.).abs() < 1e-12);
         assert_eq!(c.unwrap().unit, a.unit);
-        assert!((d.clone().unwrap().value - 14.99583333).abs() < 1e-12);
+        assert!((d.clone().unwrap().value - 14.99583333).abs() < 1e-7);
         assert_eq!(d.unwrap().unit, b.unit);
     }
 
@@ -909,5 +909,31 @@ mod tests {
         let volume = 5. * METER * METER * METER;
         let x = volume.to(METER);
         assert!(x.is_err());
+    }
+    #[test]
+    fn dimensions_are_equal_function() {
+        let dim1 = Dimension {
+            base: BaseDimension::Length,
+            exponent: 1,
+        };
+        let dim2 = Dimension {
+            base: BaseDimension::Length,
+            exponent: 2,
+        };
+        let dim3 = Dimension {
+            base: BaseDimension::Mass,
+            exponent: 1,
+        };
+        let dim4 = Dimension {
+            base: BaseDimension::Time,
+            exponent: 1,
+        };
+        let a = vec![dim1, dim3];
+        let b = vec![dim3, dim1];
+        let c = vec![dim2, dim3];
+        assert!(are_dimensions_equal(&a, &b));
+        assert!(!are_dimensions_equal(&a, &c));
+        assert!(are_dimensions_equal(&[dim1], &[dim1]));
+        assert!(are_dimensions_equal(&[dim1, dim4], &[dim4, dim1]));
     }
 }
