@@ -44,6 +44,19 @@ impl Mul for Dimension {
     }
 }
 
+impl Div<Unit> for BaseUnit {
+    type Output = Unit;
+    fn div(self, rhs: Unit) -> Self::Output {
+        self.as_unit() / rhs
+    }
+}
+impl Div<BaseUnit> for Unit {
+    type Output = Unit;
+    fn div(self, rhs: BaseUnit) -> Self::Output {
+        self / rhs.as_unit()
+    }
+}
+
 impl Div for Dimension {
     type Output = Vec<Dimension>;
     fn div(self, rhs: Self) -> Self::Output {
@@ -637,7 +650,6 @@ create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
 
 #[cfg(test)]
 mod tests {
-    use std::f64::EPSILON;
 
     use super::*;
     #[test]
@@ -818,6 +830,15 @@ mod tests {
     fn test_astronomy() {
         let volume = 3. * (MEGA_PARSEC * MEGA_PARSEC * MEGA_PARSEC);
         let volume_gpc3 = volume.to(GIGA_PARSEC * GIGA_PARSEC * GIGA_PARSEC);
-        assert!((volume_gpc3.value - 3e-9).abs() < f64::EPSILON)
+        assert!((volume_gpc3.value - 3e-9).abs() < f64::EPSILON);
+
+        let speed = 50. * (METER / SECOND);
+        let speed_kmh = speed.to(KILOMETER / HOUR);
+        dbg!(&speed_kmh);
+        assert!((speed_kmh.value - 180.).abs() < 1e-12);
+
+        let hubble_constant = 70. * (KILOMETER / SECOND) / MEGA_PARSEC;
+        let weird_hubble = hubble_constant.to(METER / (KILOMETER * HOUR));
+        assert!((weird_hubble.value - 8.16676381e-12).abs() < 1e-12); // comparing to astropyj
     }
 }
