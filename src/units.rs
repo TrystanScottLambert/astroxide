@@ -10,11 +10,16 @@ pub enum UnitError {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BaseDimension {
-    LENGTH,
-    MASS,
-    TIME,
-    TEMPERATURE,
-    UNITLESS,
+    Length,
+    Mass,
+    Time,
+    Temperature,
+    Current,
+    AgularDistance,
+    SolidAngle,
+    LuminousIntensity,
+    AmountOfSubstance,
+    Unitless,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -29,7 +34,7 @@ impl Mul for Dimension {
         if self.base == rhs.base {
             if self.exponent == -rhs.exponent {
                 vec![Dimension {
-                    base: BaseDimension::UNITLESS,
+                    base: BaseDimension::Unitless,
                     exponent: 0,
                 }]
             } else {
@@ -63,7 +68,7 @@ impl Div for Dimension {
         if self.base == rhs.base {
             if self.exponent == rhs.exponent {
                 vec![Dimension {
-                    base: BaseDimension::UNITLESS,
+                    base: BaseDimension::Unitless,
                     exponent: 0,
                 }]
             } else {
@@ -150,30 +155,19 @@ impl Div<BaseUnit> for BaseUnit {
 impl Div<f64> for BaseUnit {
     type Output = Quantity;
     fn div(self, rhs: f64) -> Self::Output {
-        let impl_unit = ImplBaseUnit {
-            base_unit: self,
-            exponent: 1,
-        };
-        let unit = Unit {
-            base_units: vec![impl_unit],
-        };
         Quantity {
-            unit,
             value: 1. / rhs,
+            unit: self.as_unit(),
         }
     }
 }
 impl Div<BaseUnit> for f64 {
     type Output = Quantity;
     fn div(self, rhs: BaseUnit) -> Self::Output {
-        let impl_unit = ImplBaseUnit {
-            base_unit: rhs,
-            exponent: -1,
-        };
-        let unit = Unit {
-            base_units: vec![impl_unit],
-        };
-        Quantity { unit, value: self }
+        Quantity {
+            value: self,
+            unit: rhs.as_unit().invert(),
+        }
     }
 }
 
@@ -230,10 +224,21 @@ impl Unit {
             })
             .collect()
     }
+    pub fn invert(&self) -> Self {
+        let base_units = self
+            .base_units
+            .iter()
+            .map(|iu| ImplBaseUnit {
+                base_unit: iu.base_unit,
+                exponent: -iu.exponent,
+            })
+            .collect();
+        Unit { base_units }
+    }
 }
 
 // Helper function to iterate over the implemented units and remove any that
-// have zero in the exponents. If there is nothing left then it returns UNITLESS
+// have zero in the exponents. If there is nothing left then it returns Unitless
 fn clean_up_zero_exponents(units: Vec<ImplBaseUnit>) -> Vec<ImplBaseUnit> {
     let mut new_vec = Vec::new();
     for iu in units {
@@ -287,17 +292,7 @@ impl Mul<Unit> for Unit {
 impl Div<Unit> for Unit {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
-        let denominator_base_units = rhs
-            .base_units
-            .iter()
-            .map(|iu| ImplBaseUnit {
-                base_unit: iu.base_unit,
-                exponent: -iu.exponent,
-            })
-            .collect();
-        self * Unit {
-            base_units: denominator_base_units,
-        }
+        self * rhs.invert()
     }
 }
 
@@ -346,14 +341,37 @@ pub struct Quantity {
     pub value: f64,
 }
 
+fn are_dimensions_equal(dimensions_a: &Vec<Dimension>, dimensions_b: &Vec<Dimension>) -> bool {
+    for dim in dimensions_a.clone() {
+        if !dimensions_b.contains(&dim) {
+            return false;
+        }
+    }
+    for dim in dimensions_b {
+        if !dimensions_a.contains(&dim) {
+            return false;
+        }
+    }
+    true
+}
+
 impl Quantity {
-    pub fn to(self, target_unit: impl UnitLike) -> Quantity {
-        Quantity {
+    pub fn to(self, target_unit: impl UnitLike) -> Result<Quantity> {
+        if !are_dimensions_equal(
+            &self.unit.clone().dimensions(),
+            &target_unit.as_unit().dimensions(),
+        ) {
+            return Err(UnitError::DifferentDimensions(
+                self.unit.dimensions(),
+                target_unit.as_unit().dimensions(),
+            ));
+        }
+        Ok(Quantity {
             unit: target_unit.as_unit(),
             value: self.value
                 * (self.unit.calculate_conversion_factor()
                     / target_unit.calculate_conversion_factor()),
-        }
+        })
     }
 }
 
@@ -463,6 +481,40 @@ impl Mul<Quantity> for BaseUnit {
         rhs * self
     }
 }
+impl Mul<f64> for Quantity {
+    type Output = Quantity;
+    fn mul(self, rhs: f64) -> Self::Output {
+        Quantity {
+            value: rhs * self.value,
+            unit: self.unit,
+        }
+    }
+}
+impl Mul<Quantity> for f64 {
+    type Output = Quantity;
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        rhs * self
+    }
+}
+impl Div<f64> for Quantity {
+    type Output = Quantity;
+    fn div(self, rhs: f64) -> Self::Output {
+        Quantity {
+            value: rhs / self.value,
+            unit: self.unit,
+        }
+    }
+}
+impl Div<Quantity> for f64 {
+    type Output = Quantity;
+    fn div(self, rhs: Quantity) -> Self::Output {
+        Quantity {
+            value: self / rhs.value,
+            unit: rhs.unit.invert(),
+        }
+    }
+}
+
 impl Div<BaseUnit> for Quantity {
     type Output = Quantity;
     fn div(self, rhs: BaseUnit) -> Self::Output {
@@ -493,21 +545,21 @@ macro_rules! create_base_unit {
     };
 }
 
-create_base_unit!(UNITLESS, "", BaseDimension::UNITLESS, 0., 0);
+create_base_unit!(UNITLESS, "", BaseDimension::Unitless, 0., 0);
 
 macro_rules! create_length_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::LENGTH, $conversion_factor, 1);
+        create_base_unit!($name, $symbol, BaseDimension::Length, $conversion_factor, 1);
     };
 }
 macro_rules! create_mass_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::MASS, $conversion_factor, 1);
+        create_base_unit!($name, $symbol, BaseDimension::Mass, $conversion_factor, 1);
     };
 }
 macro_rules! create_time_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::TIME, $conversion_factor, 1);
+        create_base_unit!($name, $symbol, BaseDimension::Time, $conversion_factor, 1);
     };
 }
 
@@ -516,7 +568,7 @@ macro_rules! create_temperature_unit {
         create_base_unit!(
             $name,
             $symbol,
-            BaseDimension::TEMPERATURE,
+            BaseDimension::Temperature,
             $conversion_factor,
             1
         );
@@ -763,6 +815,17 @@ mod tests {
         assert_eq!(c.value, 5.);
         assert_eq!(c.unit, METER.as_unit());
     }
+    #[test]
+    fn adding_and_subtracting_equivalent_units() {
+        let a = 5. * METER * 3. * SECOND;
+        let b = (3. * HOUR) * (5. * METER);
+        let c = a.clone() + b.clone();
+        let d = b.clone() - a.clone();
+        assert!((c.clone().unwrap().value - 54015.).abs() < 1e-12);
+        assert_eq!(c.unwrap().unit, a.unit);
+        assert!((d.clone().unwrap().value - 14.99583333).abs() < 1e-12);
+        assert_eq!(d.unwrap().unit, b.unit);
+    }
 
     #[test]
     fn test_adding_and_converting_units() {
@@ -770,7 +833,7 @@ mod tests {
         let distance_b = 2. * METER;
         let meter_distance = (distance_a + distance_b).unwrap();
 
-        let km_distance = meter_distance.clone().to(KILOMETER);
+        let km_distance = meter_distance.clone().to(KILOMETER).unwrap();
         let distance = (5. * METER + 1. * KILOMETER).unwrap();
         assert_eq!(distance.value, 1005.);
         assert_eq!(meter_distance.value, 7.);
@@ -791,7 +854,7 @@ mod tests {
         let distance_b = 500. * METER;
         let distance_c = CENTIMETER * 500.;
         let test_distance = (distance_a - distance_b - distance_c).unwrap();
-        let test_distance_meters = test_distance.clone().to(METER);
+        let test_distance_meters = test_distance.clone().to(METER).unwrap();
         assert_eq!(test_distance.value, 4.495);
         assert_eq!(test_distance_meters.value, 4495.);
     }
@@ -821,7 +884,7 @@ mod tests {
         let x = 5. * KILOMETER;
         let y = 10. * SECOND;
         let velocity = x / y;
-        let velocity_mh = velocity.clone().to(METER / HOUR);
+        let velocity_mh = velocity.clone().to(METER / HOUR).unwrap();
         assert_eq!(velocity.value, 0.5);
         assert_eq!(velocity_mh.value, 1800000.)
     }
@@ -829,16 +892,22 @@ mod tests {
     #[test]
     fn test_astronomy() {
         let volume = 3. * (MEGA_PARSEC * MEGA_PARSEC * MEGA_PARSEC);
-        let volume_gpc3 = volume.to(GIGA_PARSEC * GIGA_PARSEC * GIGA_PARSEC);
+        let volume_gpc3 = volume.to(GIGA_PARSEC * GIGA_PARSEC * GIGA_PARSEC).unwrap();
         assert!((volume_gpc3.value - 3e-9).abs() < f64::EPSILON);
 
         let speed = 50. * (METER / SECOND);
-        let speed_kmh = speed.to(KILOMETER / HOUR);
+        let speed_kmh = speed.to(KILOMETER / HOUR).unwrap();
         dbg!(&speed_kmh);
         assert!((speed_kmh.value - 180.).abs() < 1e-12);
 
         let hubble_constant = 70. * (KILOMETER / SECOND) / MEGA_PARSEC;
-        let weird_hubble = hubble_constant.to(METER / (KILOMETER * HOUR));
+        let weird_hubble = hubble_constant.to(METER / (KILOMETER * HOUR)).unwrap();
         assert!((weird_hubble.value - 8.16676381e-12).abs() < 1e-12); // comparing to astropyj
+    }
+    #[test]
+    fn converting_non_equivalent_units_fail() {
+        let volume = 5. * METER * METER * METER;
+        let x = volume.to(METER);
+        assert!(x.is_err());
     }
 }
