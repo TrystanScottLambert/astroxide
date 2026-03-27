@@ -302,6 +302,25 @@ impl Mul<Unit> for BaseUnit {
     }
 }
 
+impl Mul<f64> for Unit {
+    type Output = Quantity;
+    fn mul(self, rhs: f64) -> Self::Output {
+        Quantity {
+            value: rhs,
+            unit: self,
+        }
+    }
+}
+impl Mul<Unit> for f64 {
+    type Output = Quantity;
+    fn mul(self, rhs: Unit) -> Self::Output {
+        Quantity {
+            value: self,
+            unit: rhs,
+        }
+    }
+}
+
 impl UnitLike for Unit {
     fn as_unit(&self) -> Unit {
         self.clone()
@@ -618,6 +637,8 @@ create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
 
 #[cfg(test)]
 mod tests {
+    use std::f64::EPSILON;
+
     use super::*;
     #[test]
     fn test_unit_factor() {
@@ -791,5 +812,12 @@ mod tests {
         let velocity_mh = velocity.clone().to(METER / HOUR);
         assert_eq!(velocity.value, 0.5);
         assert_eq!(velocity_mh.value, 1800000.)
+    }
+
+    #[test]
+    fn test_astronomy() {
+        let volume = 3. * (MEGA_PARSEC * MEGA_PARSEC * MEGA_PARSEC);
+        let volume_gpc3 = volume.to(GIGA_PARSEC * GIGA_PARSEC * GIGA_PARSEC);
+        assert!((volume_gpc3.value - 3e-9).abs() < f64::EPSILON)
     }
 }
