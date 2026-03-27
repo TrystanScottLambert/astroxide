@@ -209,7 +209,13 @@ impl Unit {
         string_reprs.join(" ")
     }
     pub fn dimensions(self) -> Vec<Dimension> {
-        todo!()
+        self.base_units
+            .iter()
+            .map(|iu| Dimension {
+                base: iu.base_unit.base_dimension.base,
+                exponent: iu.base_unit.base_dimension.exponent * iu.exponent,
+            })
+            .collect()
     }
 }
 
@@ -339,6 +345,21 @@ impl Add for Quantity {
         })
     }
 }
+impl Add<Quantity> for Result<Quantity> {
+    type Output = Self;
+    fn add(self, rhs: Quantity) -> Self::Output {
+        let x = self?;
+        x + rhs
+    }
+}
+
+impl Add<Result<Quantity>> for Quantity {
+    type Output = Result<Quantity>;
+    fn add(self, rhs: Result<Quantity>) -> Self::Output {
+        rhs + self
+    }
+}
+
 impl Sub for Quantity {
     type Output = Result<Self>;
     fn sub(self, rhs: Self) -> Self::Output {
@@ -357,6 +378,21 @@ impl Sub for Quantity {
             unit: self.unit.clone(),
             value: new_value,
         })
+    }
+}
+impl Sub<Quantity> for Result<Quantity> {
+    type Output = Self;
+    fn sub(self, rhs: Quantity) -> Self::Output {
+        let x = self?;
+        x - rhs
+    }
+}
+
+impl Sub<Result<Quantity>> for Quantity {
+    type Output = Result<Quantity>;
+    fn sub(self, rhs: Result<Quantity>) -> Self::Output {
+        let x = rhs?;
+        self - x
     }
 }
 
@@ -582,10 +618,6 @@ create_temperature_unit!(YOCTOKELVIN, "yK", 1e-24);
 
 #[cfg(test)]
 mod tests {
-    use core::panic;
-
-    use kiddo::fixed::distance;
-
     use super::*;
     #[test]
     fn test_unit_factor() {
@@ -682,8 +714,8 @@ mod tests {
         let distance_a = 5. * METER;
         let distance_b = 2. * METER;
         let distance_c = 3. * KILOMETER;
-        let meter_distance = distance_a.clone() + distance_b;
-        let another_distance = distance_a + distance_c;
+        let meter_distance = (distance_a.clone() + distance_b).unwrap();
+        let another_distance = (distance_a + distance_c).unwrap();
 
         assert_eq!(meter_distance.value, 7.);
         assert_eq!(meter_distance.unit, METER.as_unit());
@@ -694,7 +726,7 @@ mod tests {
     fn zero_quantity() {
         let a = 5. * METER;
         let b = 0. * METER;
-        let c = a + b;
+        let c = (a + b).unwrap();
         assert_eq!(c.value, 5.);
         assert_eq!(c.unit, METER.as_unit());
     }
@@ -703,9 +735,10 @@ mod tests {
     fn test_adding_and_converting_units() {
         let distance_a = 5. * METER;
         let distance_b = 2. * METER;
-        let meter_distance = distance_a + distance_b;
+        let meter_distance = (distance_a + distance_b).unwrap();
+
         let km_distance = meter_distance.clone().to(KILOMETER);
-        let distance = 5. * METER + 1. * KILOMETER;
+        let distance = (5. * METER + 1. * KILOMETER).unwrap();
         assert_eq!(distance.value, 1005.);
         assert_eq!(meter_distance.value, 7.);
         assert_eq!(km_distance.value, 0.007);
@@ -716,8 +749,7 @@ mod tests {
         let distance = 4. * METER;
         let time = 3. * HOUR;
         let thing = distance + time;
-        dbg!(&thing);
-        assert_eq!(thing.value, 8.)
+        assert!(thing.is_err())
     }
 
     #[test]
@@ -725,7 +757,7 @@ mod tests {
         let distance_a = 5. * KILOMETER;
         let distance_b = 500. * METER;
         let distance_c = CENTIMETER * 500.;
-        let test_distance = distance_a - distance_b - distance_c;
+        let test_distance = (distance_a - distance_b - distance_c).unwrap();
         let test_distance_meters = test_distance.clone().to(METER);
         assert_eq!(test_distance.value, 4.495);
         assert_eq!(test_distance_meters.value, 4495.);
