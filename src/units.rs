@@ -579,31 +579,31 @@ macro_rules! create_temperature_unit {
 macro_rules! si {
     ($base_unit: ident, $base_symbol: expr, $base_conversion: expr, $create_macro: ident) => {
         paste! {
-            $create_macro!([<QUETTA $base_unit>], concat!("Q", $base_symbol), 1e30*$base_conversion);
-            $create_macro!([<RONNA $base_unit>], concat!("R", $base_symbol), 1e27*$base_conversion);
-            $create_macro!([<YOTTA $base_unit>], concat!("Y", $base_symbol), 1e24*$base_conversion);
-            $create_macro!([<ZETTA $base_unit>], concat!("Z", $base_symbol), 1e21*$base_conversion);
-            $create_macro!([<EXA $base_unit>], concat!("E", $base_symbol), 1e18*$base_conversion);
-            $create_macro!([<PETA $base_unit>], concat!("P", $base_symbol), 1e15*$base_conversion);
-            $create_macro!([<TERA $base_unit>], concat!("T", $base_symbol), 1e12*$base_conversion);
-            $create_macro!([<GIGA $base_unit>], concat!("G", $base_symbol), 1e9*$base_conversion);
-            $create_macro!([<MEGA $base_unit>], concat!("M", $base_symbol), 1e6*$base_conversion);
-            $create_macro!([<KILO $base_unit>], concat!("k", $base_symbol), 1e3*$base_conversion);
-            $create_macro!([<HECTO $base_unit>], concat!("h", $base_symbol), 1e2*$base_conversion);
-            $create_macro!([<DECA $base_unit>], concat!("da", $base_symbol), 1e1*$base_conversion);
+            $create_macro!([<QUETTA $base_unit>], concat!("Q", $base_symbol), 1e30 * $base_conversion);
+            $create_macro!([<RONNA $base_unit>], concat!("R", $base_symbol), 1e27 * $base_conversion);
+            $create_macro!([<YOTTA $base_unit>], concat!("Y", $base_symbol), 1e24 * $base_conversion);
+            $create_macro!([<ZETTA $base_unit>], concat!("Z", $base_symbol), 1e21 * $base_conversion);
+            $create_macro!([<EXA $base_unit>], concat!("E", $base_symbol), 1e18 * $base_conversion);
+            $create_macro!([<PETA $base_unit>], concat!("P", $base_symbol), 1e15 * $base_conversion);
+            $create_macro!([<TERA $base_unit>], concat!("T", $base_symbol), 1e12 * $base_conversion);
+            $create_macro!([<GIGA $base_unit>], concat!("G", $base_symbol), 1e9 * $base_conversion);
+            $create_macro!([<MEGA $base_unit>], concat!("M", $base_symbol), 1e6 * $base_conversion);
+            $create_macro!([<KILO $base_unit>], concat!("k", $base_symbol), 1e3 * $base_conversion);
+            $create_macro!([<HECTO $base_unit>], concat!("h", $base_symbol), 1e2 * $base_conversion);
+            $create_macro!([<DECA $base_unit>], concat!("da", $base_symbol), 1e1 * $base_conversion);
             $create_macro!($base_unit, $base_symbol, $base_conversion);
-            $create_macro!([<DECI $base_unit>], concat!("d", $base_symbol), 1e-1*$base_conversion);
-            $create_macro!([<CENTI $base_unit>], concat!("c", $base_symbol), 1e-2*$base_conversion);
-            $create_macro!([<MILLI $base_unit>], concat!("m", $base_symbol), 1e-3*$base_conversion);
-            $create_macro!([<MICRO $base_unit>], concat!("u", $base_symbol), 1e-6*$base_conversion);
-            $create_macro!([<NANO $base_unit>], concat!("n", $base_symbol), 1e-9*$base_conversion);
-            $create_macro!([<PICO $base_unit>], concat!("p", $base_symbol), 1e-12*$base_conversion);
-            $create_macro!([<FEMTO $base_unit>], concat!("f", $base_symbol), 1e-15*$base_conversion);
-            $create_macro!([<ATTO $base_unit>], concat!("a", $base_symbol), 1e-18*$base_conversion);
-            $create_macro!([<ZEPTO $base_unit>], concat!("z", $base_symbol), 1e-21*$base_conversion);
-            $create_macro!([<YOCTO $base_unit>], concat!("y", $base_symbol), 1e-24*$base_conversion);
-            $create_macro!([<RONTO $base_unit>], concat!("r", $base_symbol), 1e-27*$base_conversion);
-            $create_macro!([<QUECTO $base_unit>], concat!("q", $base_symbol), 1e-30*$base_conversion);
+            $create_macro!([<DECI $base_unit>], concat!("d", $base_symbol), 1e-1 * $base_conversion);
+            $create_macro!([<CENTI $base_unit>], concat!("c", $base_symbol), 1e-2 * $base_conversion);
+            $create_macro!([<MILLI $base_unit>], concat!("m", $base_symbol), 1e-3 * $base_conversion);
+            $create_macro!([<MICRO $base_unit>], concat!("u", $base_symbol), 1e-6 * $base_conversion);
+            $create_macro!([<NANO $base_unit>], concat!("n", $base_symbol), 1e-9 * $base_conversion);
+            $create_macro!([<PICO $base_unit>], concat!("p", $base_symbol), 1e-12 * $base_conversion);
+            $create_macro!([<FEMTO $base_unit>], concat!("f", $base_symbol), 1e-15 * $base_conversion);
+            $create_macro!([<ATTO $base_unit>], concat!("a", $base_symbol), 1e-18 * $base_conversion);
+            $create_macro!([<ZEPTO $base_unit>], concat!("z", $base_symbol), 1e-21 * $base_conversion);
+            $create_macro!([<YOCTO $base_unit>], concat!("y", $base_symbol), 1e-24 * $base_conversion);
+            $create_macro!([<RONTO $base_unit>], concat!("r", $base_symbol), 1e-27 * $base_conversion);
+            $create_macro!([<QUECTO $base_unit>], concat!("q", $base_symbol), 1e-30 * $base_conversion);
         }
     };
 }
