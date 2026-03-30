@@ -9,6 +9,39 @@ pub enum UnitError {
     DifferentDimensions(Vec<Dimension>, Vec<Dimension>),
 }
 
+fn are_dimensions_equal(dimensions_a: &[Dimension], dimensions_b: &[Dimension]) -> bool {
+    for dim in dimensions_a {
+        if !dimensions_b.contains(dim) {
+            return false;
+        }
+    }
+    for dim in dimensions_b {
+        if !dimensions_a.contains(dim) {
+            return false;
+        }
+    }
+    true
+}
+
+// Helper function to iterate over the implemented units and remove any that
+// have zero in the exponents. If there is nothing left then it returns Unitless
+fn clean_up_zero_exponents(units: Vec<ImplBaseUnit>) -> Vec<ImplBaseUnit> {
+    let mut new_vec = Vec::new();
+    for iu in units {
+        if iu.exponent != 0 && iu.base_unit != UNITLESS {
+            new_vec.push(iu);
+        }
+    }
+    if new_vec.is_empty() {
+        vec![ImplBaseUnit {
+            base_unit: UNITLESS,
+            exponent: 0,
+        }]
+    } else {
+        new_vec
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BaseDimension {
     Length,
@@ -29,65 +62,6 @@ pub struct Dimension {
     pub exponent: i32,
 }
 
-impl Mul for Dimension {
-    type Output = Vec<Dimension>;
-    fn mul(self, rhs: Self) -> Self::Output {
-        if self.base == rhs.base {
-            if self.exponent == -rhs.exponent {
-                vec![Dimension {
-                    base: BaseDimension::Unitless,
-                    exponent: 0,
-                }]
-            } else {
-                vec![Dimension {
-                    base: self.base,
-                    exponent: self.exponent + rhs.exponent,
-                }]
-            }
-        } else {
-            vec![self, rhs]
-        }
-    }
-}
-
-impl Div<Unit> for BaseUnit {
-    type Output = Unit;
-    fn div(self, rhs: Unit) -> Self::Output {
-        self.as_unit() / rhs
-    }
-}
-impl Div<BaseUnit> for Unit {
-    type Output = Unit;
-    fn div(self, rhs: BaseUnit) -> Self::Output {
-        self / rhs.as_unit()
-    }
-}
-
-impl Div for Dimension {
-    type Output = Vec<Dimension>;
-    fn div(self, rhs: Self) -> Self::Output {
-        if self.base == rhs.base {
-            if self.exponent == rhs.exponent {
-                vec![Dimension {
-                    base: BaseDimension::Unitless,
-                    exponent: 0,
-                }]
-            } else {
-                vec![Dimension {
-                    base: self.base,
-                    exponent: self.exponent - rhs.exponent,
-                }]
-            }
-        } else {
-            let negative_rhs = Dimension {
-                base: rhs.base,
-                exponent: -rhs.exponent,
-            };
-            vec![self, negative_rhs]
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BaseUnit {
     pub base_dimension: Dimension,
@@ -95,9 +69,25 @@ pub struct BaseUnit {
     pub conversion_factor: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImplBaseUnit {
+    pub base_unit: BaseUnit,
+    pub exponent: i32,
+}
+
+#[derive(Debug, Clone)]
+pub struct Unit {
+    pub base_units: Vec<ImplBaseUnit>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Quantity {
+    pub unit: Unit,
+    pub value: f64,
+}
+
 pub trait UnitLike {
     fn as_unit(&self) -> Unit;
-
     fn calculate_conversion_factor(&self) -> f64 {
         self.as_unit()
             .base_units
@@ -107,76 +97,6 @@ pub trait UnitLike {
     }
 }
 
-impl UnitLike for BaseUnit {
-    fn as_unit(&self) -> Unit {
-        Unit {
-            base_units: vec![ImplBaseUnit {
-                base_unit: *self,
-                exponent: 1,
-            }],
-        }
-    }
-}
-
-impl Mul for BaseUnit {
-    type Output = Unit;
-    fn mul(self, rhs: Self) -> Self::Output {
-        self.as_unit() * rhs.as_unit()
-    }
-}
-
-impl Mul<f64> for BaseUnit {
-    type Output = Quantity;
-    fn mul(self, rhs: f64) -> Self::Output {
-        let implemented_unit = ImplBaseUnit {
-            base_unit: self,
-            exponent: 1,
-        };
-        let unit: Unit = Unit {
-            base_units: vec![implemented_unit],
-        };
-        Quantity { unit, value: rhs }
-    }
-}
-
-impl Mul<BaseUnit> for f64 {
-    type Output = Quantity;
-    fn mul(self, rhs: BaseUnit) -> Self::Output {
-        rhs * self
-    }
-}
-
-impl Div<BaseUnit> for BaseUnit {
-    type Output = Unit;
-    fn div(self, rhs: BaseUnit) -> Self::Output {
-        self.as_unit() / rhs.as_unit()
-    }
-}
-
-impl Div<f64> for BaseUnit {
-    type Output = Quantity;
-    fn div(self, rhs: f64) -> Self::Output {
-        Quantity {
-            value: 1. / rhs,
-            unit: self.as_unit(),
-        }
-    }
-}
-impl Div<BaseUnit> for f64 {
-    type Output = Quantity;
-    fn div(self, rhs: BaseUnit) -> Self::Output {
-        Quantity {
-            value: self,
-            unit: rhs.as_unit().invert(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ImplBaseUnit {
-    pub base_unit: BaseUnit,
-    pub exponent: i32,
-}
 impl ImplBaseUnit {
     pub fn string_repr(&self) -> String {
         match self.exponent {
@@ -184,27 +104,6 @@ impl ImplBaseUnit {
             1 => self.base_unit.symbol.to_string(),
             _ => format!("{}{}", self.base_unit.symbol, Superscript(self.exponent)),
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Unit {
-    pub base_units: Vec<ImplBaseUnit>,
-}
-
-impl PartialEq for Unit {
-    fn eq(&self, other: &Self) -> bool {
-        for iu in self.base_units.clone() {
-            if !other.base_units.contains(&iu) {
-                return false;
-            }
-        }
-        for iu in other.base_units.clone() {
-            if !self.base_units.contains(&iu) {
-                return false;
-            }
-        }
-        true
     }
 }
 
@@ -238,26 +137,206 @@ impl Unit {
     }
 }
 
-// Helper function to iterate over the implemented units and remove any that
-// have zero in the exponents. If there is nothing left then it returns Unitless
-fn clean_up_zero_exponents(units: Vec<ImplBaseUnit>) -> Vec<ImplBaseUnit> {
-    let mut new_vec = Vec::new();
-    for iu in units {
-        if iu.exponent != 0 && iu.base_unit != UNITLESS {
-            new_vec.push(iu);
+impl Quantity {
+    pub fn to(self, target_unit: impl UnitLike) -> Result<Quantity> {
+        if !are_dimensions_equal(
+            &self.unit.clone().dimensions(),
+            &target_unit.as_unit().dimensions(),
+        ) {
+            return Err(UnitError::DifferentDimensions(
+                self.unit.dimensions(),
+                target_unit.as_unit().dimensions(),
+            ));
         }
-    }
-    if new_vec.is_empty() {
-        vec![ImplBaseUnit {
-            base_unit: UNITLESS,
-            exponent: 0,
-        }]
-    } else {
-        new_vec
+        Ok(Quantity {
+            unit: target_unit.as_unit(),
+            value: self.value
+                * (self.unit.calculate_conversion_factor()
+                    / target_unit.calculate_conversion_factor()),
+        })
     }
 }
 
-impl Mul<Unit> for Unit {
+impl UnitLike for Unit {
+    fn as_unit(&self) -> Unit {
+        self.clone()
+    }
+}
+
+impl UnitLike for BaseUnit {
+    fn as_unit(&self) -> Unit {
+        Unit {
+            base_units: vec![ImplBaseUnit {
+                base_unit: *self,
+                exponent: 1,
+            }],
+        }
+    }
+}
+
+impl PartialEq for Unit {
+    fn eq(&self, other: &Self) -> bool {
+        for iu in self.base_units.clone() {
+            if !other.base_units.contains(&iu) {
+                return false;
+            }
+        }
+        for iu in other.base_units.clone() {
+            if !self.base_units.contains(&iu) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Div for Dimension {
+    type Output = Vec<Dimension>;
+    fn div(self, rhs: Self) -> Self::Output {
+        if self.base == rhs.base {
+            if self.exponent == rhs.exponent {
+                vec![Dimension {
+                    base: BaseDimension::Unitless,
+                    exponent: 0,
+                }]
+            } else {
+                vec![Dimension {
+                    base: self.base,
+                    exponent: self.exponent - rhs.exponent,
+                }]
+            }
+        } else {
+            let negative_rhs = Dimension {
+                base: rhs.base,
+                exponent: -rhs.exponent,
+            };
+            vec![self, negative_rhs]
+        }
+    }
+}
+
+impl Div<BaseUnit> for BaseUnit {
+    type Output = Unit;
+    fn div(self, rhs: BaseUnit) -> Self::Output {
+        self.as_unit() / rhs.as_unit()
+    }
+}
+
+impl Div<Unit> for Unit {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        self * rhs.invert()
+    }
+}
+
+impl Div<Quantity> for Quantity {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        let unit = self.unit / rhs.unit;
+        let value = self.value / rhs.value;
+
+        Quantity { value, unit }
+    }
+}
+
+impl Div<Unit> for BaseUnit {
+    type Output = Unit;
+    fn div(self, rhs: Unit) -> Self::Output {
+        self.as_unit() / rhs
+    }
+}
+impl Div<BaseUnit> for Unit {
+    type Output = Unit;
+    fn div(self, rhs: BaseUnit) -> Self::Output {
+        self / rhs.as_unit()
+    }
+}
+
+impl Div<f64> for BaseUnit {
+    type Output = Quantity;
+    fn div(self, rhs: f64) -> Self::Output {
+        Quantity {
+            value: 1. / rhs,
+            unit: self.as_unit(),
+        }
+    }
+}
+
+impl Div<BaseUnit> for f64 {
+    type Output = Quantity;
+    fn div(self, rhs: BaseUnit) -> Self::Output {
+        Quantity {
+            value: self,
+            unit: rhs.as_unit().invert(),
+        }
+    }
+}
+
+impl Div<f64> for Quantity {
+    type Output = Quantity;
+    fn div(self, rhs: f64) -> Self::Output {
+        Quantity {
+            value: rhs / self.value,
+            unit: self.unit,
+        }
+    }
+}
+impl Div<Quantity> for f64 {
+    type Output = Quantity;
+    fn div(self, rhs: Quantity) -> Self::Output {
+        Quantity {
+            value: self / rhs.value,
+            unit: rhs.unit.invert(),
+        }
+    }
+}
+
+impl Div<BaseUnit> for Quantity {
+    type Output = Quantity;
+    fn div(self, rhs: BaseUnit) -> Self::Output {
+        let new_unit = self.unit / rhs.as_unit();
+        Quantity {
+            value: self.value,
+            unit: new_unit,
+        }
+    }
+}
+impl Div<Quantity> for BaseUnit {
+    type Output = Quantity;
+    fn div(self, rhs: Quantity) -> Self::Output {
+        rhs / self
+    }
+}
+
+impl Mul for Dimension {
+    type Output = Vec<Dimension>;
+    fn mul(self, rhs: Self) -> Self::Output {
+        if self.base == rhs.base {
+            if self.exponent == -rhs.exponent {
+                vec![Dimension {
+                    base: BaseDimension::Unitless,
+                    exponent: 0,
+                }]
+            } else {
+                vec![Dimension {
+                    base: self.base,
+                    exponent: self.exponent + rhs.exponent,
+                }]
+            }
+        } else {
+            vec![self, rhs]
+        }
+    }
+}
+
+impl Mul for BaseUnit {
+    type Output = Unit;
+    fn mul(self, rhs: Self) -> Self::Output {
+        self.as_unit() * rhs.as_unit()
+    }
+}
+
+impl Mul for Unit {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
         let mut new_impl_units = Vec::new();
@@ -290,10 +369,33 @@ impl Mul<Unit> for Unit {
     }
 }
 
-impl Div<Unit> for Unit {
+impl Mul for Quantity {
     type Output = Self;
-    fn div(self, rhs: Self) -> Self::Output {
-        self * rhs.invert()
+    fn mul(self, rhs: Self) -> Self::Output {
+        let unit = self.unit * rhs.unit;
+        let value = self.value * rhs.value;
+        Quantity { value, unit }
+    }
+}
+
+impl Mul<f64> for BaseUnit {
+    type Output = Quantity;
+    fn mul(self, rhs: f64) -> Self::Output {
+        let implemented_unit = ImplBaseUnit {
+            base_unit: self,
+            exponent: 1,
+        };
+        let unit: Unit = Unit {
+            base_units: vec![implemented_unit],
+        };
+        Quantity { unit, value: rhs }
+    }
+}
+
+impl Mul<BaseUnit> for f64 {
+    type Output = Quantity;
+    fn mul(self, rhs: BaseUnit) -> Self::Output {
+        rhs * self
     }
 }
 
@@ -330,49 +432,35 @@ impl Mul<Unit> for f64 {
     }
 }
 
-impl UnitLike for Unit {
-    fn as_unit(&self) -> Unit {
-        self.clone()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Quantity {
-    pub unit: Unit,
-    pub value: f64,
-}
-
-fn are_dimensions_equal(dimensions_a: &[Dimension], dimensions_b: &[Dimension]) -> bool {
-    for dim in dimensions_a {
-        if !dimensions_b.contains(dim) {
-            return false;
+impl Mul<BaseUnit> for Quantity {
+    type Output = Quantity;
+    fn mul(self, rhs: BaseUnit) -> Self::Output {
+        let new_unit = self.unit * rhs.as_unit();
+        Quantity {
+            value: self.value,
+            unit: new_unit,
         }
     }
-    for dim in dimensions_b {
-        if !dimensions_a.contains(dim) {
-            return false;
+}
+impl Mul<Quantity> for BaseUnit {
+    type Output = Quantity;
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        rhs * self
+    }
+}
+impl Mul<f64> for Quantity {
+    type Output = Quantity;
+    fn mul(self, rhs: f64) -> Self::Output {
+        Quantity {
+            value: rhs * self.value,
+            unit: self.unit,
         }
     }
-    true
 }
-
-impl Quantity {
-    pub fn to(self, target_unit: impl UnitLike) -> Result<Quantity> {
-        if !are_dimensions_equal(
-            &self.unit.clone().dimensions(),
-            &target_unit.as_unit().dimensions(),
-        ) {
-            return Err(UnitError::DifferentDimensions(
-                self.unit.dimensions(),
-                target_unit.as_unit().dimensions(),
-            ));
-        }
-        Ok(Quantity {
-            unit: target_unit.as_unit(),
-            value: self.value
-                * (self.unit.calculate_conversion_factor()
-                    / target_unit.calculate_conversion_factor()),
-        })
+impl Mul<Quantity> for f64 {
+    type Output = Quantity;
+    fn mul(self, rhs: Quantity) -> Self::Output {
+        rhs * self
     }
 }
 
@@ -431,6 +519,7 @@ impl Sub for Quantity {
         })
     }
 }
+
 impl Sub<Quantity> for Result<Quantity> {
     type Output = Self;
     fn sub(self, rhs: Quantity) -> Self::Output {
@@ -444,92 +533,6 @@ impl Sub<Result<Quantity>> for Quantity {
     fn sub(self, rhs: Result<Quantity>) -> Self::Output {
         let x = rhs?;
         self - x
-    }
-}
-
-impl Mul<Quantity> for Quantity {
-    type Output = Self;
-    fn mul(self, rhs: Self) -> Self::Output {
-        let unit = self.unit * rhs.unit;
-        let value = self.value * rhs.value;
-        Quantity { value, unit }
-    }
-}
-
-impl Div<Quantity> for Quantity {
-    type Output = Self;
-    fn div(self, rhs: Self) -> Self::Output {
-        let unit = self.unit / rhs.unit;
-        let value = self.value / rhs.value;
-
-        Quantity { value, unit }
-    }
-}
-
-impl Mul<BaseUnit> for Quantity {
-    type Output = Quantity;
-    fn mul(self, rhs: BaseUnit) -> Self::Output {
-        let new_unit = self.unit * rhs.as_unit();
-        Quantity {
-            value: self.value,
-            unit: new_unit,
-        }
-    }
-}
-impl Mul<Quantity> for BaseUnit {
-    type Output = Quantity;
-    fn mul(self, rhs: Quantity) -> Self::Output {
-        rhs * self
-    }
-}
-impl Mul<f64> for Quantity {
-    type Output = Quantity;
-    fn mul(self, rhs: f64) -> Self::Output {
-        Quantity {
-            value: rhs * self.value,
-            unit: self.unit,
-        }
-    }
-}
-impl Mul<Quantity> for f64 {
-    type Output = Quantity;
-    fn mul(self, rhs: Quantity) -> Self::Output {
-        rhs * self
-    }
-}
-impl Div<f64> for Quantity {
-    type Output = Quantity;
-    fn div(self, rhs: f64) -> Self::Output {
-        Quantity {
-            value: rhs / self.value,
-            unit: self.unit,
-        }
-    }
-}
-impl Div<Quantity> for f64 {
-    type Output = Quantity;
-    fn div(self, rhs: Quantity) -> Self::Output {
-        Quantity {
-            value: self / rhs.value,
-            unit: rhs.unit.invert(),
-        }
-    }
-}
-
-impl Div<BaseUnit> for Quantity {
-    type Output = Quantity;
-    fn div(self, rhs: BaseUnit) -> Self::Output {
-        let new_unit = self.unit / rhs.as_unit();
-        Quantity {
-            value: self.value,
-            unit: new_unit,
-        }
-    }
-}
-impl Div<Quantity> for BaseUnit {
-    type Output = Quantity;
-    fn div(self, rhs: Quantity) -> Self::Output {
-        rhs / self
     }
 }
 
