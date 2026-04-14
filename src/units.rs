@@ -320,6 +320,9 @@ impl Mul for Unit {
         }
 
         new_units.retain(|_, exponent| *exponent != 0);
+        if new_units.is_empty() {
+            new_units = BTreeMap::from([(UNITLESS, 0)])
+        }
         Unit {
             base_units: new_units,
         }
