@@ -728,19 +728,19 @@ si!(RADIAN, "rad", 1., create_angular_distance_unit);
 si!(
     DEGREE,
     "deg",
-    180. / std::f64::consts::PI,
+    std::f64::consts::PI / 180.,
     create_angular_distance_unit
 );
 si!(
     ARCMINUTE,
     "arcmin",
-    60. * 180. / std::f64::consts::PI,
+    std::f64::consts::PI / 60. * 180.,
     create_angular_distance_unit
 );
 si!(
     ARCSECOND,
     "arcsec",
-    3600. * 180. / std::f64::consts::PI,
+    std::f64::consts::PI / 3600. * 180.,
     create_angular_distance_unit
 );
 
