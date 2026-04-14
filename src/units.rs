@@ -173,7 +173,7 @@ impl Display for Quantity {
 
 impl UnitLike for Unit {
     fn as_unit(&self) -> Unit {
-        self.clone()
+        self.to_owned()
     }
 }
 
