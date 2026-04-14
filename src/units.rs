@@ -52,7 +52,7 @@ pub enum BaseDimension {
     Time,
     Temperature,
     Current,
-    AgularDistance,
+    AngularDistance,
     SolidAngle,
     LuminousIntensity,
     AmountOfSubstance,
@@ -96,7 +96,7 @@ pub trait UnitLike {
             .base_units
             .iter()
             .map(|iu| iu.base_unit.conversion_factor.powi(iu.exponent))
-            .fold(1., |acc, x| acc * x)
+            .product()
     }
 }
 
@@ -509,7 +509,7 @@ impl Add<Quantity> for Result<Quantity> {
 impl Add<Result<Quantity>> for Quantity {
     type Output = Result<Quantity>;
     fn add(self, rhs: Result<Quantity>) -> Self::Output {
-        rhs + self
+        rhs + self // avoids recursive call 'self + rhs'
     }
 }
 
