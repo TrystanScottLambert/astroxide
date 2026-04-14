@@ -1,6 +1,9 @@
 use fmtastic::Superscript;
 use paste::paste;
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    fmt::{self, Display},
+    ops::{Add, Div, Mul, Sub},
+};
 
 pub type Result<T> = core::result::Result<T, UnitError>;
 
@@ -97,24 +100,29 @@ pub trait UnitLike {
     }
 }
 
-impl ImplBaseUnit {
-    pub fn string_repr(&self) -> String {
-        match self.exponent {
+impl Display for ImplBaseUnit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let repr = match self.exponent {
             0 => String::new(),
             1 => self.base_unit.symbol.to_string(),
             _ => format!("{}{}", self.base_unit.symbol, Superscript(self.exponent)),
-        }
+        };
+        write!(f, "{}", repr)
     }
 }
 
+impl Display for Unit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string_reprs: Vec<String> =
+            self.base_units.iter().map(|iu| format!("{}", iu)).collect();
+        write!(f, "{}", string_reprs.join(" "))
+    }
+}
 impl Unit {
     pub fn get_units_list(&self) -> Vec<BaseUnit> {
         self.base_units.iter().map(|iu| iu.base_unit).collect()
     }
-    pub fn get_unit_string(self) -> String {
-        let string_reprs: Vec<String> = self.base_units.iter().map(|iu| iu.string_repr()).collect();
-        string_reprs.join(" ")
-    }
+
     pub fn dimensions(self) -> Vec<Dimension> {
         self.base_units
             .iter()
@@ -154,6 +162,12 @@ impl Quantity {
                 * (self.unit.calculate_conversion_factor()
                     / target_unit.calculate_conversion_factor()),
         })
+    }
+}
+
+impl Display for Quantity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.value, self.unit)
     }
 }
 
@@ -812,20 +826,27 @@ mod tests {
     fn test_printing_derived_units() {
         let unit = METER * SECOND * KILOMETER * METER;
         let answer = String::from("m² s km");
-        let result = unit.get_unit_string();
+        let result = unit.to_string();
         let mut answer_strings: Vec<&str> = answer.split(" ").collect();
         let mut result_strings: Vec<&str> = result.split(" ").collect();
         answer_strings.sort();
         result_strings.sort();
         assert_eq!(answer_strings, result_strings)
     }
+
+    #[test]
+    fn test_printing_quantities() {
+        let quant = 5. * MEGAPARSEC / SECOND;
+        assert_eq!(quant.to_string(), "5 Mpc s⁻¹")
+    }
+
     #[test]
     fn test_impl_string_repr() {
         let a = ImplBaseUnit {
             base_unit: MEGAPARSEC,
             exponent: 2,
         };
-        assert_eq!(a.string_repr(), String::from("Mpc²"))
+        assert_eq!(format!("{}", a), String::from("Mpc²"))
     }
 
     #[test]
