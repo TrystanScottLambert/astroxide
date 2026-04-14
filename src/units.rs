@@ -643,9 +643,9 @@ create_length_unit!(CHAIN, "ch", 20.1168);
 create_length_unit!(FURLONG, "fur", 201.168);
 create_length_unit!(MILE, "mi", 1609.344);
 create_length_unit!(LEAGUE, "lea", 4828.032);
-create_length_unit!(FATHOM, "ftm", 1.852);
+create_length_unit!(FATHOM, "ftm", 1.8288);
 create_length_unit!(CABLE, "cable", 185.2);
-create_length_unit!(NAUTICAL_MILE, "nmi", 185.2);
+create_length_unit!(NAUTICAL_MILE, "nmi", 1852.);
 create_length_unit!(LINK, "link", 0.201168);
 create_length_unit!(ROD, "rod", 5.0292);
 
