@@ -119,7 +119,7 @@ impl Display for Unit {
     }
 }
 impl Unit {
-    pub fn get_units_list(&self) -> Vec<BaseUnit> {
+    pub fn units_list(&self) -> Vec<BaseUnit> {
         self.base_units.iter().map(|iu| iu.base_unit).collect()
     }
 
@@ -354,8 +354,8 @@ impl Mul for Unit {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
         let mut new_impl_units = Vec::new();
-        let self_base_units = self.get_units_list();
-        let rhs_base_unit_list = rhs.get_units_list();
+        let self_base_units = self.units_list();
+        let rhs_base_unit_list = rhs.units_list();
 
         for (i, base_unit) in self_base_units.iter().enumerate() {
             if !rhs_base_unit_list.contains(base_unit) {
