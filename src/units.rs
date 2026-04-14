@@ -123,7 +123,7 @@ impl Unit {
         self.base_units.iter().map(|iu| iu.base_unit).collect()
     }
 
-    pub fn dimensions(self) -> Vec<Dimension> {
+    pub fn dimensions(&self) -> Vec<Dimension> {
         self.base_units
             .iter()
             .map(|iu| Dimension {
@@ -147,10 +147,7 @@ impl Unit {
 
 impl Quantity {
     pub fn to(self, target_unit: impl UnitLike) -> Result<Quantity> {
-        if !are_dimensions_equal(
-            &self.unit.clone().dimensions(),
-            &target_unit.as_unit().dimensions(),
-        ) {
+        if !are_dimensions_equal(&self.unit.dimensions(), &target_unit.as_unit().dimensions()) {
             return Err(UnitError::DifferentDimensions(
                 self.unit.dimensions(),
                 target_unit.as_unit().dimensions(),
@@ -481,8 +478,8 @@ impl Mul<Quantity> for f64 {
 impl Add for Quantity {
     type Output = Result<Self>;
     fn add(self, rhs: Self) -> Self::Output {
-        let self_dimensions = self.unit.clone().dimensions();
-        let rhs_dimensions = rhs.unit.clone().dimensions();
+        let self_dimensions = self.unit.dimensions();
+        let rhs_dimensions = rhs.unit.dimensions();
         if !are_dimensions_equal(&self_dimensions, &rhs_dimensions) {
             return Err(UnitError::DifferentDimensions(
                 self_dimensions,
@@ -516,8 +513,8 @@ impl Add<Result<Quantity>> for Quantity {
 impl Sub for Quantity {
     type Output = Result<Self>;
     fn sub(self, rhs: Self) -> Self::Output {
-        let self_dimensions = self.unit.clone().dimensions();
-        let rhs_dimensions = rhs.unit.clone().dimensions();
+        let self_dimensions = self.unit.dimensions();
+        let rhs_dimensions = rhs.unit.dimensions();
         if !are_dimensions_equal(&self_dimensions, &rhs_dimensions) {
             return Err(UnitError::DifferentDimensions(
                 self_dimensions,
@@ -694,7 +691,7 @@ si!(PARSEC, "pc", 3.09e16, create_length_unit);
 // Imperial Length Units
 create_length_unit!(TWIP, "twip", 0.000017638888888);
 create_length_unit!(THOU, "th", 0.0000254);
-create_length_unit!(BARLEYCORN, "barelycorn", 0.008466666666);
+create_length_unit!(BARLEYCORN, "barleycorn", 0.008466666666);
 create_length_unit!(INCH, "in", 0.0254);
 create_length_unit!(HAND, "hh", 0.1016);
 create_length_unit!(FOOT, "ft", 0.3048);
