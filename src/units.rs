@@ -153,6 +153,7 @@ impl Quantity {
                 target_unit.as_unit().dimensions(),
             ));
         }
+
         Ok(Quantity {
             unit: target_unit.as_unit(),
             value: self.value
@@ -731,13 +732,13 @@ si!(
 si!(
     ARCMINUTE,
     "arcmin",
-    std::f64::consts::PI / 60. * 180.,
+    std::f64::consts::PI / (60. * 180.),
     create_angular_distance_unit
 );
 si!(
     ARCSECOND,
     "arcsec",
-    std::f64::consts::PI / 3600. * 180.,
+    std::f64::consts::PI / (3600. * 180.),
     create_angular_distance_unit
 );
 
@@ -994,5 +995,18 @@ mod tests {
         assert!(!are_dimensions_equal(&a, &c));
         assert!(are_dimensions_equal(&[dim1], &[dim1]));
         assert!(are_dimensions_equal(&[dim1, dim4], &[dim4, dim1]));
+    }
+
+    #[test]
+    fn testing_angular_conversions() {
+        let a = 5. * RADIAN;
+        let b = 2. * DEGREE;
+        assert_eq!(a.clone().to(DEGREE).unwrap().value, 286.4788975654116);
+        assert_eq!(a.clone().to(ARCSECOND).unwrap().value, 1031324.0312354818);
+        assert_eq!(a.to(ARCMINUTE).unwrap().value, 17188.7338539247);
+
+        assert_eq!(b.clone().to(RADIAN).unwrap().value, 0.03490658503988659);
+        assert_eq!(b.clone().to(ARCSECOND).unwrap().value, 3600. * 2.);
+        assert_eq!(b.to(ARCMINUTE).unwrap().value, 60. * 2.);
     }
 }
