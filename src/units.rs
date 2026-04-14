@@ -593,6 +593,65 @@ macro_rules! create_temperature_unit {
     };
 }
 
+macro_rules! create_current_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::Current,
+            $conversion_factor,
+            1
+        );
+    };
+}
+
+macro_rules! create_angular_distance_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::AngularDistance,
+            $conversion_factor,
+            1
+        );
+    };
+}
+macro_rules! create_solid_angle_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::SolidAngle,
+            $conversion_factor,
+            1
+        );
+    };
+}
+
+macro_rules! create_luminous_intensity_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::LuminousIntensity,
+            $conversion_factor,
+            1
+        );
+    };
+}
+
+macro_rules! create_amount_of_substance_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            BaseDimension::AmountOfSubstance,
+            $conversion_factor,
+            1
+        );
+    };
+}
+
 macro_rules! si {
     ($base_unit: ident, $base_symbol: expr, $base_conversion: expr, $create_macro: ident) => {
         paste! {
@@ -626,6 +685,7 @@ macro_rules! si {
 }
 
 si!(METER, "m", 1., create_length_unit);
+create_length_unit!(ANGSTROM, "Å", 1e10); // Adding missing Angstrom
 // Astronomical Length Units
 si!(ASTRONOMICAL_UNIT, "AU", 1.496e11, create_length_unit);
 si!(LIGHTYEAR, "lyr", 9.5e15, create_length_unit);
@@ -662,6 +722,38 @@ si!(HOUR, "hr", 3600., create_time_unit);
 
 // Metric Temperature units
 si!(KELVIN, "K", 1., create_temperature_unit);
+
+// Angular Distance Units
+si!(RADIAN, "rad", 1., create_angular_distance_unit);
+si!(
+    DEGREE,
+    "deg",
+    180. / std::f64::consts::PI,
+    create_angular_distance_unit
+);
+si!(
+    ARCMINUTE,
+    "arcmin",
+    60. * 180. / std::f64::consts::PI,
+    create_angular_distance_unit
+);
+si!(
+    ARCSECOND,
+    "arcsec",
+    3600. * 180. / std::f64::consts::PI,
+    create_angular_distance_unit
+);
+
+// Current Units
+si!(AMPERE, "A", 1., create_current_unit);
+
+// Solid Angle
+si!(STERADIAN, "sr", 1., create_solid_angle_unit);
+
+// Luminous Intensity
+si!(CANDELA, "cd", 1., create_luminous_intensity_unit);
+
+si!(MOL, "mol", 1., create_amount_of_substance_unit);
 
 #[cfg(test)]
 mod tests {
