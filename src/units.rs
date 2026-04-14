@@ -1,6 +1,8 @@
 use fmtastic::Superscript;
 use paste::paste;
+use std::cmp::Ordering;
 use std::{
+    collections::BTreeMap,
     fmt::{self, Display},
     ops::{Add, Div, Mul, Sub},
 };
@@ -9,43 +11,10 @@ pub type Result<T> = core::result::Result<T, UnitError>;
 
 #[derive(Debug, Clone)]
 pub enum UnitError {
-    DifferentDimensions(Vec<Dimension>, Vec<Dimension>),
+    DifferentDimensions(BTreeMap<BaseDimension, i32>, BTreeMap<BaseDimension, i32>),
 }
 
-fn are_dimensions_equal(dimensions_a: &[Dimension], dimensions_b: &[Dimension]) -> bool {
-    for dim in dimensions_a {
-        if !dimensions_b.contains(dim) {
-            return false;
-        }
-    }
-    for dim in dimensions_b {
-        if !dimensions_a.contains(dim) {
-            return false;
-        }
-    }
-    true
-}
-
-// Helper function to iterate over the implemented units and remove any that
-// have zero in the exponents. If there is nothing left then it returns Unitless
-fn clean_up_zero_exponents(units: Vec<ImplBaseUnit>) -> Vec<ImplBaseUnit> {
-    let mut new_vec = Vec::new();
-    for iu in units {
-        if iu.exponent != 0 && iu.base_unit != UNITLESS {
-            new_vec.push(iu);
-        }
-    }
-    if new_vec.is_empty() {
-        vec![ImplBaseUnit {
-            base_unit: UNITLESS,
-            exponent: 0,
-        }]
-    } else {
-        new_vec
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BaseDimension {
     Length,
     Mass,
@@ -59,28 +28,41 @@ pub enum BaseDimension {
     Unitless,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Dimension {
     pub base: BaseDimension,
     pub exponent: i32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct BaseUnit {
     pub base_dimension: Dimension,
     pub symbol: &'static str,
     pub conversion_factor: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ImplBaseUnit {
-    pub base_unit: BaseUnit,
-    pub exponent: i32,
+impl Ord for BaseUnit {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.base_dimension, &self.symbol).cmp(&(other.base_dimension, &other.symbol))
+    }
 }
+
+impl PartialOrd for BaseUnit {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for BaseUnit {
+    fn eq(&self, other: &Self) -> bool {
+        (self.base_dimension == other.base_dimension) && (self.symbol == other.symbol)
+    }
+}
+impl Eq for BaseUnit {}
 
 #[derive(Debug, Clone)]
 pub struct Unit {
-    pub base_units: Vec<ImplBaseUnit>,
+    pub base_units: BTreeMap<BaseUnit, i32>,
 }
 
 #[derive(Debug, Clone)]
@@ -95,59 +77,49 @@ pub trait UnitLike {
         self.as_unit()
             .base_units
             .iter()
-            .map(|iu| iu.base_unit.conversion_factor.powi(iu.exponent))
+            .map(|(base_unit, &exponent)| base_unit.conversion_factor.powi(exponent))
             .product()
-    }
-}
-
-impl Display for ImplBaseUnit {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let repr = match self.exponent {
-            0 => String::new(),
-            1 => self.base_unit.symbol.to_string(),
-            _ => format!("{}{}", self.base_unit.symbol, Superscript(self.exponent)),
-        };
-        write!(f, "{}", repr)
     }
 }
 
 impl Display for Unit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string_reprs: Vec<String> =
-            self.base_units.iter().map(|iu| format!("{}", iu)).collect();
+        let string_reprs: Vec<String> = self
+            .base_units
+            .iter()
+            .map(|(base_unit, &exponent)| match exponent {
+                1 => base_unit.symbol.to_string(),
+                _ => format!("{}{}", base_unit.symbol, Superscript(exponent)),
+            })
+            .collect();
         write!(f, "{}", string_reprs.join(" "))
     }
 }
 impl Unit {
-    pub fn units_list(&self) -> Vec<BaseUnit> {
-        self.base_units.iter().map(|iu| iu.base_unit).collect()
-    }
-
-    pub fn dimensions(&self) -> Vec<Dimension> {
-        self.base_units
-            .iter()
-            .map(|iu| Dimension {
-                base: iu.base_unit.base_dimension.base,
-                exponent: iu.base_unit.base_dimension.exponent * iu.exponent,
-            })
-            .collect()
+    pub fn dimensions(&self) -> BTreeMap<BaseDimension, i32> {
+        let mut dimensions = BTreeMap::new();
+        for (base_unit, exponent) in &self.base_units {
+            dimensions.insert(
+                base_unit.base_dimension.base,
+                base_unit.base_dimension.exponent * exponent,
+            );
+        }
+        dimensions
     }
     pub fn invert(&self) -> Self {
-        let base_units = self
-            .base_units
-            .iter()
-            .map(|iu| ImplBaseUnit {
-                base_unit: iu.base_unit,
-                exponent: -iu.exponent,
-            })
-            .collect();
-        Unit { base_units }
+        let mut inverted = BTreeMap::new();
+        for (base_unit, exponent) in &self.base_units {
+            inverted.insert(*base_unit, -exponent);
+        }
+        Unit {
+            base_units: inverted,
+        }
     }
 }
 
 impl Quantity {
     pub fn to(self, target_unit: impl UnitLike) -> Result<Quantity> {
-        if !are_dimensions_equal(&self.unit.dimensions(), &target_unit.as_unit().dimensions()) {
+        if self.unit.dimensions() != target_unit.as_unit().dimensions() {
             return Err(UnitError::DifferentDimensions(
                 self.unit.dimensions(),
                 target_unit.as_unit().dimensions(),
@@ -178,27 +150,14 @@ impl UnitLike for Unit {
 impl UnitLike for BaseUnit {
     fn as_unit(&self) -> Unit {
         Unit {
-            base_units: vec![ImplBaseUnit {
-                base_unit: *self,
-                exponent: 1,
-            }],
+            base_units: BTreeMap::from([(*self, 1)]),
         }
     }
 }
 
 impl PartialEq for Unit {
     fn eq(&self, other: &Self) -> bool {
-        for iu in self.base_units.clone() {
-            if !other.base_units.contains(&iu) {
-                return false;
-            }
-        }
-        for iu in other.base_units.clone() {
-            if !self.base_units.contains(&iu) {
-                return false;
-            }
-        }
-        true
+        self.base_units == other.base_units
     }
 }
 
@@ -351,32 +310,18 @@ impl Mul for BaseUnit {
 impl Mul for Unit {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut new_impl_units = Vec::new();
-        let self_base_units = self.units_list();
-        let rhs_base_unit_list = rhs.units_list();
+        let mut new_units = rhs.base_units.clone();
 
-        for (i, base_unit) in self_base_units.iter().enumerate() {
-            if !rhs_base_unit_list.contains(base_unit) {
-                new_impl_units.push(*self.base_units.get(i).unwrap())
-            }
+        for (base_unit, exponent) in self.base_units {
+            new_units
+                .entry(base_unit)
+                .and_modify(|curr| *curr += exponent)
+                .or_insert(exponent);
         }
 
-        for impl_unit in rhs.base_units {
-            if self_base_units.contains(&impl_unit.base_unit) {
-                for iu in self.base_units.clone() {
-                    if iu.base_unit == impl_unit.base_unit {
-                        new_impl_units.push(ImplBaseUnit {
-                            base_unit: iu.base_unit,
-                            exponent: iu.exponent + impl_unit.exponent,
-                        })
-                    }
-                }
-            } else {
-                new_impl_units.push(impl_unit);
-            }
-        }
+        new_units.retain(|_, exponent| *exponent != 0);
         Unit {
-            base_units: clean_up_zero_exponents(new_impl_units),
+            base_units: new_units,
         }
     }
 }
@@ -393,12 +338,8 @@ impl Mul for Quantity {
 impl Mul<f64> for BaseUnit {
     type Output = Quantity;
     fn mul(self, rhs: f64) -> Self::Output {
-        let implemented_unit = ImplBaseUnit {
-            base_unit: self,
-            exponent: 1,
-        };
         let unit: Unit = Unit {
-            base_units: vec![implemented_unit],
+            base_units: BTreeMap::from([(self, 1)]),
         };
         Quantity { unit, value: rhs }
     }
@@ -481,7 +422,7 @@ impl Add for Quantity {
     fn add(self, rhs: Self) -> Self::Output {
         let self_dimensions = self.unit.dimensions();
         let rhs_dimensions = rhs.unit.dimensions();
-        if !are_dimensions_equal(&self_dimensions, &rhs_dimensions) {
+        if self_dimensions != rhs_dimensions {
             return Err(UnitError::DifferentDimensions(
                 self_dimensions,
                 rhs_dimensions,
@@ -516,7 +457,7 @@ impl Sub for Quantity {
     fn sub(self, rhs: Self) -> Self::Output {
         let self_dimensions = self.unit.dimensions();
         let rhs_dimensions = rhs.unit.dimensions();
-        if !are_dimensions_equal(&self_dimensions, &rhs_dimensions) {
+        if self_dimensions != rhs_dimensions {
             return Err(UnitError::DifferentDimensions(
                 self_dimensions,
                 rhs_dimensions,
@@ -786,32 +727,13 @@ mod tests {
         let b = METER * METER * METER; // unit * base_unit
         let c = METER * KILOMETER * SECOND * KILOMETER;
         let answer_a = Unit {
-            base_units: vec![ImplBaseUnit {
-                base_unit: METER,
-                exponent: 2,
-            }],
+            base_units: { BTreeMap::from([(METER, 2)]) },
         };
         let answer_b = Unit {
-            base_units: vec![ImplBaseUnit {
-                base_unit: METER,
-                exponent: 3,
-            }],
+            base_units: { BTreeMap::from([(METER, 3)]) },
         };
         let answer_c = Unit {
-            base_units: vec![
-                ImplBaseUnit {
-                    base_unit: METER,
-                    exponent: 1,
-                },
-                ImplBaseUnit {
-                    base_unit: SECOND,
-                    exponent: 1,
-                },
-                ImplBaseUnit {
-                    base_unit: KILOMETER,
-                    exponent: 2,
-                },
-            ],
+            base_units: { BTreeMap::from([(METER, 1), (SECOND, 1), (KILOMETER, 2)]) },
         };
         assert_eq!(a, answer_a);
         assert_eq!(b, answer_b);
@@ -823,28 +745,12 @@ mod tests {
         let a = METER;
         let b = METER;
         let c = a / b;
-        assert_eq!(
-            c.base_units,
-            vec![ImplBaseUnit {
-                base_unit: UNITLESS,
-                exponent: 0,
-            }]
-        );
+        assert_eq!(c.base_units, BTreeMap::from([(UNITLESS, 0)]));
 
         let a = METER;
         let b = SECOND;
         let c = a / b;
-        let answer_simple = vec![
-            ImplBaseUnit {
-                base_unit: METER,
-                exponent: 1,
-            },
-            ImplBaseUnit {
-                base_unit: SECOND,
-                exponent: -1,
-            },
-        ];
-        assert_eq!(c.base_units, answer_simple);
+        assert_eq!(c.base_units, BTreeMap::from([(METER, 1), (SECOND, -1)]));
     }
 
     #[test]
@@ -931,15 +837,6 @@ mod tests {
     }
 
     #[test]
-    fn test_impl_string_repr() {
-        let a = ImplBaseUnit {
-            base_unit: MEGAPARSEC,
-            exponent: 2,
-        };
-        assert_eq!(format!("{}", a), String::from("Mpc²"))
-    }
-
-    #[test]
     fn test_derived_units() {
         let x = 5. * KILOMETER;
         let y = 10. * SECOND;
@@ -969,32 +866,6 @@ mod tests {
         let volume = 5. * METER * METER * METER;
         let x = volume.to(METER);
         assert!(x.is_err());
-    }
-    #[test]
-    fn dimensions_are_equal_function() {
-        let dim1 = Dimension {
-            base: BaseDimension::Length,
-            exponent: 1,
-        };
-        let dim2 = Dimension {
-            base: BaseDimension::Length,
-            exponent: 2,
-        };
-        let dim3 = Dimension {
-            base: BaseDimension::Mass,
-            exponent: 1,
-        };
-        let dim4 = Dimension {
-            base: BaseDimension::Time,
-            exponent: 1,
-        };
-        let a = vec![dim1, dim3];
-        let b = vec![dim3, dim1];
-        let c = vec![dim2, dim3];
-        assert!(are_dimensions_equal(&a, &b));
-        assert!(!are_dimensions_equal(&a, &c));
-        assert!(are_dimensions_equal(&[dim1], &[dim1]));
-        assert!(are_dimensions_equal(&[dim1, dim4], &[dim4, dim1]));
     }
 
     #[test]
