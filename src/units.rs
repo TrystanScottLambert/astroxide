@@ -581,6 +581,17 @@ macro_rules! create_amount_of_substance_unit {
     };
 }
 
+macro_rules! create_frequency_unit {
+    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+        create_base_unit!(
+            $name,
+            $symbol,
+            create_dimension!(time: -1),
+            $conversion_factor
+        );
+    };
+}
+
 macro_rules! si {
     ($base_unit: ident, $base_symbol: expr, $base_conversion: expr, $create_macro: ident) => {
         paste! {
@@ -682,7 +693,11 @@ si!(STERADIAN, "sr", 1., create_solid_angle_unit);
 // Luminous Intensity
 si!(CANDELA, "cd", 1., create_luminous_intensity_unit);
 
+// Amount of substance.
 si!(MOL, "mol", 1., create_amount_of_substance_unit);
+
+// Frequency units.
+si!(HERTZ, "Hz", 1., create_frequency_unit);
 
 #[cfg(test)]
 mod tests {
@@ -877,5 +892,12 @@ mod tests {
         assert_eq!(b.clone().to(RADIAN).value, 0.03490658503988659);
         assert_eq!(b.clone().to(ARCSECOND).value, 3600. * 2.);
         assert_eq!(b.to(ARCMINUTE).value, 60. * 2.);
+    }
+
+    #[test]
+    fn test_derived_equivalence() {
+        let a = 5. * HERTZ;
+        let b = a.to((1. / HOUR).unit);
+        assert_eq!(b.value, 18000.)
     }
 }
