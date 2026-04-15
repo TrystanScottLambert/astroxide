@@ -6,11 +6,13 @@ use std::{
     fmt::{self, Display},
     ops::{Add, Div, Mul, Sub},
 };
+use thiserror::Error;
 
 pub type Result<T> = core::result::Result<T, UnitError>;
 
-#[derive(Debug, Clone)]
+#[derive(Error, Debug, Clone)]
 pub enum UnitError {
+    #[error("Quantities have different dimensions.")]
     DifferentDimensions(BTreeMap<BaseDimension, i32>, BTreeMap<BaseDimension, i32>),
 }
 
