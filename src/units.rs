@@ -343,9 +343,6 @@ impl Mul for Unit {
         }
 
         new_units.retain(|_, exponent| *exponent != 0);
-        if new_units.is_empty() {
-            new_units = BTreeMap::from([(UNITLESS, 0)])
-        }
         Unit {
             base_units: new_units,
         }
@@ -524,13 +521,6 @@ macro_rules! create_base_unit {
         };
     };
 }
-
-create_base_unit!(
-    UNITLESS,
-    "",
-    dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 0, 0),
-    0.
-);
 
 macro_rules! create_length_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
@@ -782,7 +772,7 @@ mod tests {
         let a = METER;
         let b = METER;
         let c = a / b;
-        assert_eq!(c.base_units, BTreeMap::from([(UNITLESS, 0)]));
+        assert_eq!(c.base_units, BTreeMap::new());
 
         let a = METER;
         let b = SECOND;
