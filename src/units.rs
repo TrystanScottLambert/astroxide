@@ -6,15 +6,6 @@ use std::{
     fmt::{self, Display},
     ops::{Add, Div, Mul, Sub},
 };
-use thiserror::Error;
-
-pub type Result<T> = core::result::Result<T, UnitError>;
-
-#[derive(Error, Debug, Clone)]
-pub enum UnitError {
-    #[error("Quantities have different dimensions.")]
-    DifferentDimensions(Dimension, Dimension),
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Dimension {
@@ -187,20 +178,21 @@ impl Unit {
 }
 
 impl Quantity {
-    pub fn to(self, target_unit: impl UnitLike) -> Result<Quantity> {
+    pub fn to(self, target_unit: impl UnitLike) -> Quantity {
         if self.unit.dimensions() != target_unit.as_unit().dimensions() {
-            return Err(UnitError::DifferentDimensions(
-                self.unit.dimensions(),
-                target_unit.as_unit().dimensions(),
-            ));
+            panic!(
+                "Cannot convert {} to {} since they have different dimensions.",
+                self.unit,
+                target_unit.as_unit()
+            )
         }
 
-        Ok(Quantity {
+        Quantity {
             unit: target_unit.as_unit(),
             value: self.value
                 * (self.unit.calculate_conversion_factor()
                     / target_unit.calculate_conversion_factor()),
-        })
+        }
     }
 }
 
@@ -441,74 +433,41 @@ impl Mul<Quantity> for f64 {
 }
 
 impl Add for Quantity {
-    type Output = Result<Self>;
+    type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        let self_dimensions = self.unit.dimensions();
-        let rhs_dimensions = rhs.unit.dimensions();
-        if self_dimensions != rhs_dimensions {
-            return Err(UnitError::DifferentDimensions(
-                self_dimensions,
-                rhs_dimensions,
-            ));
+        if self.unit.dimensions() != rhs.unit.dimensions() {
+            panic!(
+                "Cannot add units {} and {} since they have different dimensions.",
+                self.unit, rhs.unit,
+            )
         }
+        assert_eq!(self.unit.dimensions(), rhs.unit.dimensions());
         let new_value = (self.value * self.unit.calculate_conversion_factor()
             + rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
-        Ok(Quantity {
+        Quantity {
             unit: self.unit.clone(),
             value: new_value,
-        })
-    }
-}
-impl Add<Quantity> for Result<Quantity> {
-    type Output = Self;
-    fn add(self, rhs: Quantity) -> Self::Output {
-        let x = self?;
-        x + rhs
-    }
-}
-
-impl Add<Result<Quantity>> for Quantity {
-    type Output = Result<Quantity>;
-    fn add(self, rhs: Result<Quantity>) -> Self::Output {
-        rhs + self // avoids recursive call 'self + rhs'
+        }
     }
 }
 
 impl Sub for Quantity {
-    type Output = Result<Self>;
+    type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        let self_dimensions = self.unit.dimensions();
-        let rhs_dimensions = rhs.unit.dimensions();
-        if self_dimensions != rhs_dimensions {
-            return Err(UnitError::DifferentDimensions(
-                self_dimensions,
-                rhs_dimensions,
-            ));
+        if self.unit.dimensions() != rhs.unit.dimensions() {
+            panic!(
+                "Cannot subtract units {} and {} since they have different dimensions.",
+                self.unit, rhs.unit,
+            )
         }
         let new_value = (self.value * self.unit.calculate_conversion_factor()
             - rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
-        Ok(Quantity {
+        Quantity {
             unit: self.unit.clone(),
             value: new_value,
-        })
-    }
-}
-
-impl Sub<Quantity> for Result<Quantity> {
-    type Output = Self;
-    fn sub(self, rhs: Quantity) -> Self::Output {
-        let x = self?;
-        x - rhs
-    }
-}
-
-impl Sub<Result<Quantity>> for Quantity {
-    type Output = Result<Quantity>;
-    fn sub(self, rhs: Result<Quantity>) -> Self::Output {
-        let x = rhs?;
-        self - x
+        }
     }
 }
 
@@ -785,8 +744,8 @@ mod tests {
         let distance_a = 5. * METER;
         let distance_b = 2. * METER;
         let distance_c = 3. * KILOMETER;
-        let meter_distance = (distance_a.clone() + distance_b).unwrap();
-        let another_distance = (distance_a + distance_c).unwrap();
+        let meter_distance = distance_a.clone() + distance_b;
+        let another_distance = distance_a + distance_c;
 
         assert_eq!(meter_distance.value, 7.);
         assert_eq!(meter_distance.unit, METER.as_unit());
@@ -797,7 +756,7 @@ mod tests {
     fn zero_quantity() {
         let a = 5. * METER;
         let b = 0. * METER;
-        let c = (a + b).unwrap();
+        let c = a + b;
         assert_eq!(c.value, 5.);
         assert_eq!(c.unit, METER.as_unit());
     }
@@ -807,31 +766,39 @@ mod tests {
         let b = (3. * HOUR) * (5. * METER);
         let c = a.clone() + b.clone();
         let d = b.clone() - a.clone();
-        assert!((c.clone().unwrap().value - 54015.).abs() < 1e-12);
-        assert_eq!(c.unwrap().unit, a.unit);
-        assert!((d.clone().unwrap().value - 14.99583333).abs() < 1e-7);
-        assert_eq!(d.unwrap().unit, b.unit);
+        assert!((c.clone().value - 54015.).abs() < 1e-12);
+        assert_eq!(c.unit, a.unit);
+        assert!((d.clone().value - 14.99583333).abs() < 1e-7);
+        assert_eq!(d.unit, b.unit);
     }
 
     #[test]
     fn test_adding_and_converting_units() {
         let distance_a = 5. * METER;
         let distance_b = 2. * METER;
-        let meter_distance = (distance_a + distance_b).unwrap();
+        let meter_distance = distance_a + distance_b;
 
-        let km_distance = meter_distance.clone().to(KILOMETER).unwrap();
-        let distance = (5. * METER + 1. * KILOMETER).unwrap();
+        let km_distance = meter_distance.clone().to(KILOMETER);
+        let distance = 5. * METER + 1. * KILOMETER;
         assert_eq!(distance.value, 1005.);
         assert_eq!(meter_distance.value, 7.);
         assert_eq!(km_distance.value, 0.007);
     }
 
     #[test]
-    fn test_adding_and_subtracting_non_equivalent_units_fails() {
+    #[should_panic(expected = "Cannot add")]
+    fn test_adding_non_equivalent_units_fails() {
         let distance = 4. * METER;
         let time = 3. * HOUR;
-        let thing = distance + time;
-        assert!(thing.is_err())
+        let _ = distance + time;
+    }
+
+    #[test]
+    #[should_panic(expected = "Cannot subtract")]
+    fn test_subtracting_non_equivalent_units_fails() {
+        let distance = 4. * METER;
+        let time = 3. * HOUR;
+        let _ = distance - time;
     }
 
     #[test]
@@ -839,8 +806,8 @@ mod tests {
         let distance_a = 5. * KILOMETER;
         let distance_b = 500. * METER;
         let distance_c = CENTIMETER * 500.;
-        let test_distance = (distance_a - distance_b - distance_c).unwrap();
-        let test_distance_meters = test_distance.clone().to(METER).unwrap();
+        let test_distance = distance_a - distance_b - distance_c;
+        let test_distance_meters = test_distance.clone().to(METER);
         assert_eq!(test_distance.value, 4.495);
         assert_eq!(test_distance_meters.value, 4495.);
     }
@@ -868,7 +835,7 @@ mod tests {
         let x = 5. * KILOMETER;
         let y = 10. * SECOND;
         let velocity = x / y;
-        let velocity_mh = velocity.clone().to(METER / HOUR).unwrap();
+        let velocity_mh = velocity.clone().to(METER / HOUR);
         assert_eq!(velocity.value, 0.5);
         assert_eq!(velocity_mh.value, 1800000.)
     }
@@ -876,35 +843,35 @@ mod tests {
     #[test]
     fn test_astronomy() {
         let volume = 3. * (MEGAPARSEC * MEGAPARSEC * MEGAPARSEC);
-        let volume_gpc3 = volume.to(GIGAPARSEC * GIGAPARSEC * GIGAPARSEC).unwrap();
+        let volume_gpc3 = volume.to(GIGAPARSEC * GIGAPARSEC * GIGAPARSEC);
         assert!((volume_gpc3.value - 3e-9).abs() < f64::EPSILON);
 
         let speed = 50. * (METER / SECOND);
-        let speed_kmh = speed.to(KILOMETER / HOUR).unwrap();
+        let speed_kmh = speed.to(KILOMETER / HOUR);
         dbg!(&speed_kmh);
         assert!((speed_kmh.value - 180.).abs() < 1e-12);
 
         let hubble_constant = 70. * (KILOMETER / SECOND) / MEGAPARSEC;
-        let weird_hubble = hubble_constant.to(METER / (KILOMETER * HOUR)).unwrap();
+        let weird_hubble = hubble_constant.to(METER / (KILOMETER * HOUR));
         assert!((weird_hubble.value - 8.16676381e-12).abs() < 1e-12); // comparing to astropyj
     }
     #[test]
+    #[should_panic(expected = "Cannot convert")]
     fn converting_non_equivalent_units_fail() {
         let volume = 5. * METER * METER * METER;
-        let x = volume.to(METER);
-        assert!(x.is_err());
+        let _ = volume.to(METER);
     }
 
     #[test]
     fn testing_angular_conversions() {
         let a = 5. * RADIAN;
         let b = 2. * DEGREE;
-        assert_eq!(a.clone().to(DEGREE).unwrap().value, 286.4788975654116);
-        assert_eq!(a.clone().to(ARCSECOND).unwrap().value, 1031324.0312354818);
-        assert_eq!(a.to(ARCMINUTE).unwrap().value, 17188.7338539247);
+        assert_eq!(a.clone().to(DEGREE).value, 286.4788975654116);
+        assert_eq!(a.clone().to(ARCSECOND).value, 1031324.0312354818);
+        assert_eq!(a.to(ARCMINUTE).value, 17188.7338539247);
 
-        assert_eq!(b.clone().to(RADIAN).unwrap().value, 0.03490658503988659);
-        assert_eq!(b.clone().to(ARCSECOND).unwrap().value, 3600. * 2.);
-        assert_eq!(b.to(ARCMINUTE).unwrap().value, 60. * 2.);
+        assert_eq!(b.clone().to(RADIAN).value, 0.03490658503988659);
+        assert_eq!(b.clone().to(ARCSECOND).value, 3600. * 2.);
+        assert_eq!(b.to(ARCMINUTE).value, 60. * 2.);
     }
 }
