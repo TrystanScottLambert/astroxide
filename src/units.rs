@@ -466,7 +466,7 @@ impl Sub for Quantity {
     }
 }
 
-macro_rules! create_dimension {
+macro_rules! dim {
     ($($field:ident: $value:expr),* $(,)?) => {
         Dimension {
             $($field: $value,)*
@@ -485,112 +485,46 @@ macro_rules! create_base_unit {
     };
 }
 
-macro_rules! create_length_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(length: 1),
-            $conversion_factor
-        );
+macro_rules! unit_generator {
+    ($macro_name: ident, $dimensions: expr) => {
+        macro_rules! $macro_name {
+            ($name: ident, $symbol: expr, $conversion_factor: expr) => {
+                create_base_unit!($name, $symbol, $dimensions, $conversion_factor);
+            };
+        }
     };
 }
-macro_rules! create_mass_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(mass: 1),
-            $conversion_factor
-        );
-    };
-}
-macro_rules! create_time_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(time: 1),
-            $conversion_factor
-        );
-    };
-}
-
-macro_rules! create_temperature_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(temperature: 1),
-            $conversion_factor
-        );
-    };
-}
-
-macro_rules! create_current_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(current: 1),
-            $conversion_factor
-        );
-    };
-}
-
-macro_rules! create_angular_distance_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(angular_distance: 1),
-            $conversion_factor
-        );
-    };
-}
-macro_rules! create_solid_angle_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(solid_angle: 1),
-            $conversion_factor
-        );
-    };
-}
-
-macro_rules! create_luminous_intensity_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(luminous_intensity: 1),
-            $conversion_factor
-        );
-    };
-}
-
-macro_rules! create_amount_of_substance_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(amount_of_substance: 1),
-            $conversion_factor
-        );
-    };
-}
-
-macro_rules! create_frequency_unit {
-    ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!(
-            $name,
-            $symbol,
-            create_dimension!(time: -1),
-            $conversion_factor
-        );
-    };
-}
+unit_generator!(length, dim!(length: 1));
+unit_generator!(mass, dim!(mass: 1));
+unit_generator!(time, dim!(time: 1));
+unit_generator!(temperature, dim!(temperature: 1));
+unit_generator!(current, dim!(current: 1));
+unit_generator!(angular_distance, dim!(angular_distance: 1));
+unit_generator!(solid_angle, dim!(solid_angle: 1));
+unit_generator!(luminous_intensity, dim!(luminous_intensity: 1));
+unit_generator!(amount_of_substance, dim!(amount_of_substance: 1));
+unit_generator!(frequency, dim!(time: -1));
+unit_generator!(force, dim!(mass: 1, length: 1, time: -2));
+unit_generator!(pressure, dim!(mass: 1, length: -1, time: -2));
+unit_generator!(energy, dim!(mass: 1, length: 2, time: -2));
+unit_generator!(power, dim!(mass: 1, length: 2, time: -3));
+unit_generator!(charge, dim!(time: 1, current: 1));
+unit_generator!(voltage, dim!(mass: 1, length: 2, time: -3, current: -1));
+unit_generator!(resistance, dim!(mass: 1, length: 2, time: -3, current: -2));
+unit_generator!(conductance, dim!(mass: -1, length: -2, time: 3, current: 2));
+unit_generator!(capacitance, dim!(mass: -1, length: -2, time: 4, current: 2));
+unit_generator!(inductance, dim!(mass: 1, length: 2, time: -2, current: -2));
+unit_generator!(magnetic_flux_density, dim!(mass: 1, time: -2, current: -1));
+unit_generator!(
+    magnetic_flux,
+    dim!(mass: 1, length: 2, time: -2, current: -1)
+);
+unit_generator!(luminous_flux, dim!(luminous_intensity: 1, solid_angle: 1));
+unit_generator!(illuminance, dim!(luminous_intensity: 1, length: -2));
+unit_generator!(radioactivity, dim!(time: -1));
+unit_generator!(absorbed_dose, dim!(length: 2, time: -2));
+unit_generator!(equivalent_dose, dim!(length: 2, time: -2));
+unit_generator!(catalytic_activity, dim!(time: -1, amount_of_substance: 1));
 
 macro_rules! si {
     ($base_unit: ident, $base_symbol: expr, $base_conversion: expr, $create_macro: ident) => {
@@ -624,80 +558,95 @@ macro_rules! si {
     };
 }
 
-si!(METER, "m", 1., create_length_unit);
-create_length_unit!(ANGSTROM, "Å", 1e-10); // Adding missing Angstrom
+si!(METER, "m", 1., length);
+length!(ANGSTROM, "Å", 1e-10); // Adding missing Angstrom
 // Astronomical Length Units
-si!(ASTRONOMICAL_UNIT, "AU", 1.496e11, create_length_unit);
-si!(LIGHTYEAR, "lyr", 9.5e15, create_length_unit);
-si!(PARSEC, "pc", 3.09e16, create_length_unit);
+si!(ASTRONOMICAL_UNIT, "AU", 1.496e11, length);
+si!(LIGHTYEAR, "lyr", 9.5e15, length);
+si!(PARSEC, "pc", 3.09e16, length);
 
 // Imperial Length Units
-create_length_unit!(TWIP, "twip", 0.000017638888888);
-create_length_unit!(THOU, "th", 0.0000254);
-create_length_unit!(BARLEYCORN, "barleycorn", 0.008466666666);
-create_length_unit!(INCH, "in", 0.0254);
-create_length_unit!(HAND, "hh", 0.1016);
-create_length_unit!(FOOT, "ft", 0.3048);
-create_length_unit!(YARD, "yd", 0.9144);
-create_length_unit!(CHAIN, "ch", 20.1168);
-create_length_unit!(FURLONG, "fur", 201.168);
-create_length_unit!(MILE, "mi", 1609.344);
-create_length_unit!(LEAGUE, "lea", 4828.032);
-create_length_unit!(FATHOM, "ftm", 1.8288);
-create_length_unit!(CABLE, "cable", 185.2);
-create_length_unit!(NAUTICAL_MILE, "nmi", 1852.);
-create_length_unit!(LINK, "link", 0.201168);
-create_length_unit!(ROD, "rod", 5.0292);
+length!(TWIP, "twip", 0.000017638888888);
+length!(THOU, "th", 0.0000254);
+length!(BARLEYCORN, "barleycorn", 0.008466666666);
+length!(INCH, "in", 0.0254);
+length!(HAND, "hh", 0.1016);
+length!(FOOT, "ft", 0.3048);
+length!(YARD, "yd", 0.9144);
+length!(CHAIN, "ch", 20.1168);
+length!(FURLONG, "fur", 201.168);
+length!(MILE, "mi", 1609.344);
+length!(LEAGUE, "lea", 4828.032);
+length!(FATHOM, "ftm", 1.8288);
+length!(CABLE, "cable", 185.2);
+length!(NAUTICAL_MILE, "nmi", 1852.);
+length!(LINK, "link", 0.201168);
+length!(ROD, "rod", 5.0292);
 
 // Mass
-si!(GRAM, "g", 1., create_mass_unit);
+si!(GRAM, "g", 1., mass);
 
 // Astronomical Mass Units
-create_mass_unit!(SOLAR_MASS, "msun", 1.988475e33);
+mass!(SOLAR_MASS, "msun", 1.988475e33);
 
 // Time
-si!(SECOND, "s", 1., create_time_unit);
-si!(MINUTE, "min", 60., create_time_unit);
-si!(HOUR, "hr", 3600., create_time_unit);
+si!(SECOND, "s", 1., time);
+si!(MINUTE, "min", 60., time);
+si!(HOUR, "hr", 3600., time);
 
 // Metric Temperature units
-si!(KELVIN, "K", 1., create_temperature_unit);
+si!(KELVIN, "K", 1., temperature);
 
 // Angular Distance Units
-si!(RADIAN, "rad", 1., create_angular_distance_unit);
-si!(
-    DEGREE,
-    "deg",
-    std::f64::consts::PI / 180.,
-    create_angular_distance_unit
-);
+si!(RADIAN, "rad", 1., angular_distance);
+si!(DEGREE, "deg", std::f64::consts::PI / 180., angular_distance);
 si!(
     ARCMINUTE,
     "arcmin",
     std::f64::consts::PI / (60. * 180.),
-    create_angular_distance_unit
+    angular_distance
 );
 si!(
     ARCSECOND,
     "arcsec",
     std::f64::consts::PI / (3600. * 180.),
-    create_angular_distance_unit
+    angular_distance
 );
 
 // Current Units
-si!(AMPERE, "A", 1., create_current_unit);
+si!(AMPERE, "A", 1., current);
 
 // Solid Angle
-si!(STERADIAN, "sr", 1., create_solid_angle_unit);
+si!(STERADIAN, "sr", 1., solid_angle);
 
 // Luminous Intensity
-si!(CANDELA, "cd", 1., create_luminous_intensity_unit);
+si!(CANDELA, "cd", 1., luminous_intensity);
 
 // Amount of substance.
-si!(MOL, "mol", 1., create_amount_of_substance_unit);
+si!(MOL, "mol", 1., amount_of_substance);
 
-// Frequency units.
-si!(HERTZ, "Hz", 1., create_frequency_unit);
+// Derived Units
+si!(HERTZ, "Hz", 1., frequency);
+si!(NEWTON, "N", 1., force);
+si!(PASCAL, "Pa", 1., pressure);
+si!(JOULE, "J", 1., energy);
+si!(ERG, "erg", 1e-7, energy);
+si!(WATT, "W", 1., power);
+power!(SOLAR_LUM, "Lsun", 3.828e26);
+si!(COULOMB, "C", 1., charge);
+si!(VOLT, "V", 1., voltage);
+si!(OHM, "Ω", 1., resistance);
+si!(SIEMAN, "S", 1., conductance);
+si!(FARAD, "F", 1., capacitance);
+si!(HENRY, "H", 1., inductance);
+si!(TESLA, "T", 1., magnetic_flux_density);
+si!(WEBER, "Wb", 1., magnetic_flux);
+si!(LUMEN, "lm", 1., luminous_flux);
+si!(LUX, "lx", 1., illuminance);
+si!(BECQUEREL, "Bq", 1., radioactivity);
+si!(GRAY, "Gy", 1., absorbed_dose);
+si!(SIEVERT, "Sv", 1., equivalent_dose);
+si!(KATAL, "kat", 1., catalytic_activity);
 
 #[cfg(test)]
 mod tests {
