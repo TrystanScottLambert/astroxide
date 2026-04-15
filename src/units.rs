@@ -20,25 +20,20 @@ pub struct Dimension {
     pub amount_of_substance: i32,
 }
 
-macro_rules! dimension_fingerprint {
-    ($length: expr, $mass: expr, $time: expr, $temperature: expr, $current: expr, $angular_distance: expr, $solid_angle: expr, $luminous_intensity: expr, $amount_of_substance: expr ) => {
-        Dimension {
-            length: $length,
-            mass: $mass,
-            time: $time,
-            temperature: $temperature,
-            current: $current,
-            angular_distance: $angular_distance,
-            solid_angle: $solid_angle,
-            luminous_intensity: $luminous_intensity,
-            amount_of_substance: $amount_of_substance,
-        }
-    };
-}
-
 impl Dimension {
+    pub const ZERO: Dimension = Dimension {
+        length: 0,
+        mass: 0,
+        time: 0,
+        temperature: 0,
+        current: 0,
+        angular_distance: 0,
+        solid_angle: 0,
+        luminous_intensity: 0,
+        amount_of_substance: 0,
+    };
     pub fn new() -> Self {
-        dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 0, 0)
+        Self::ZERO
     }
 }
 
@@ -471,6 +466,15 @@ impl Sub for Quantity {
     }
 }
 
+macro_rules! create_dimension {
+    ($($field:ident: $value:expr),* $(,)?) => {
+        Dimension {
+            $($field: $value,)*
+            ..Dimension::ZERO
+        }
+    };
+}
+
 macro_rules! create_base_unit {
     ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr) => {
         pub static $name: BaseUnit = BaseUnit {
@@ -486,7 +490,7 @@ macro_rules! create_length_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(1, 0, 0, 0, 0, 0, 0, 0, 0),
+            create_dimension!(length: 1),
             $conversion_factor
         );
     };
@@ -496,7 +500,7 @@ macro_rules! create_mass_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(0, 1, 0, 0, 0, 0, 0, 0, 0),
+            create_dimension!(mass: 1),
             $conversion_factor
         );
     };
@@ -506,7 +510,7 @@ macro_rules! create_time_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(0, 0, 1, 0, 0, 0, 0, 0, 0),
+            create_dimension!(time: 1),
             $conversion_factor
         );
     };
@@ -517,7 +521,7 @@ macro_rules! create_temperature_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(0, 0, 0, 1, 0, 0, 0, 0, 0),
+            create_dimension!(temperature: 1),
             $conversion_factor
         );
     };
@@ -528,7 +532,7 @@ macro_rules! create_current_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(0, 0, 0, 0, 1, 0, 0, 0, 0),
+            create_dimension!(current: 1),
             $conversion_factor
         );
     };
@@ -539,7 +543,7 @@ macro_rules! create_angular_distance_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(0, 0, 0, 0, 0, 1, 0, 0, 0),
+            create_dimension!(angular_distance: 1),
             $conversion_factor
         );
     };
@@ -549,7 +553,7 @@ macro_rules! create_solid_angle_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(0, 0, 0, 0, 0, 0, 1, 0, 0),
+            create_dimension!(solid_angle: 1),
             $conversion_factor
         );
     };
@@ -560,7 +564,7 @@ macro_rules! create_luminous_intensity_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 1, 0),
+            create_dimension!(luminous_intensity: 1),
             $conversion_factor
         );
     };
@@ -571,7 +575,7 @@ macro_rules! create_amount_of_substance_unit {
         create_base_unit!(
             $name,
             $symbol,
-            dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 0, 1),
+            create_dimension!(amount_of_substance: 1),
             $conversion_factor
         );
     };
