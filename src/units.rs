@@ -13,27 +13,91 @@ pub type Result<T> = core::result::Result<T, UnitError>;
 #[derive(Error, Debug, Clone)]
 pub enum UnitError {
     #[error("Quantities have different dimensions.")]
-    DifferentDimensions(BTreeMap<BaseDimension, i32>, BTreeMap<BaseDimension, i32>),
+    DifferentDimensions(Dimension, Dimension),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BaseDimension {
-    Length,
-    Mass,
-    Time,
-    Temperature,
-    Current,
-    AngularDistance,
-    SolidAngle,
-    LuminousIntensity,
-    AmountOfSubstance,
-    Unitless,
+pub struct Dimension {
+    length: i32,
+    mass: i32,
+    time: i32,
+    temperature: i32,
+    current: i32,
+    angular_distance: i32,
+    solid_angle: i32,
+    luminous_intensity: i32,
+    amount_of_substance: i32,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-pub struct Dimension {
-    pub base: BaseDimension,
-    pub exponent: i32,
+macro_rules! dimension_fingerprint {
+    ($length: expr, $mass: expr, $time: expr, $temperature: expr, $current: expr, $angular_distance: expr, $solid_angle: expr, $luminous_intensity: expr, $amount_of_substance: expr ) => {
+        Dimension {
+            length: $length,
+            mass: $mass,
+            time: $time,
+            temperature: $temperature,
+            current: $current,
+            angular_distance: $angular_distance,
+            solid_angle: $solid_angle,
+            luminous_intensity: $luminous_intensity,
+            amount_of_substance: $amount_of_substance,
+        }
+    };
+}
+
+impl Dimension {
+    fn new() -> Self {
+        dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 0, 0)
+    }
+}
+
+impl Mul<i32> for Dimension {
+    type Output = Self;
+    fn mul(self, rhs: i32) -> Self::Output {
+        Dimension {
+            length: self.length * rhs,
+            mass: self.mass * rhs,
+            time: self.time * rhs,
+            temperature: self.temperature * rhs,
+            current: self.current * rhs,
+            angular_distance: self.angular_distance * rhs,
+            solid_angle: self.solid_angle * rhs,
+            luminous_intensity: self.luminous_intensity * rhs,
+            amount_of_substance: self.amount_of_substance * rhs,
+        }
+    }
+}
+impl Add for Dimension {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        Dimension {
+            length: self.length + rhs.length,
+            mass: self.mass + rhs.mass,
+            time: self.time + rhs.time,
+            temperature: self.temperature + rhs.temperature,
+            current: self.current + rhs.current,
+            angular_distance: self.angular_distance + rhs.angular_distance,
+            solid_angle: self.solid_angle + rhs.solid_angle,
+            luminous_intensity: self.luminous_intensity + rhs.luminous_intensity,
+            amount_of_substance: self.amount_of_substance + rhs.amount_of_substance,
+        }
+    }
+}
+impl Sub for Dimension {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Dimension {
+            length: self.length - rhs.length,
+            mass: self.mass - rhs.mass,
+            time: self.time - rhs.time,
+            temperature: self.temperature - rhs.temperature,
+            current: self.current - rhs.current,
+            angular_distance: self.angular_distance - rhs.angular_distance,
+            solid_angle: self.solid_angle - rhs.solid_angle,
+            luminous_intensity: self.luminous_intensity - rhs.luminous_intensity,
+            amount_of_substance: self.amount_of_substance - rhs.amount_of_substance,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -98,15 +162,12 @@ impl Display for Unit {
     }
 }
 impl Unit {
-    pub fn dimensions(&self) -> BTreeMap<BaseDimension, i32> {
-        let mut dimensions = BTreeMap::new();
-        for (base_unit, exponent) in &self.base_units {
-            dimensions.insert(
-                base_unit.base_dimension.base,
-                base_unit.base_dimension.exponent * exponent,
-            );
+    pub fn dimensions(&self) -> Dimension {
+        let mut full_dimension = Dimension::new();
+        for (base_unit, &exponent) in &self.base_units {
+            full_dimension = full_dimension + (base_unit.base_dimension * exponent)
         }
-        dimensions
+        full_dimension
     }
     pub fn invert(&self) -> Self {
         let mut inverted = BTreeMap::new();
@@ -160,31 +221,6 @@ impl UnitLike for BaseUnit {
 impl PartialEq for Unit {
     fn eq(&self, other: &Self) -> bool {
         self.base_units == other.base_units
-    }
-}
-
-impl Div for Dimension {
-    type Output = Vec<Dimension>;
-    fn div(self, rhs: Self) -> Self::Output {
-        if self.base == rhs.base {
-            if self.exponent == rhs.exponent {
-                vec![Dimension {
-                    base: BaseDimension::Unitless,
-                    exponent: 0,
-                }]
-            } else {
-                vec![Dimension {
-                    base: self.base,
-                    exponent: self.exponent - rhs.exponent,
-                }]
-            }
-        } else {
-            let negative_rhs = Dimension {
-                base: rhs.base,
-                exponent: -rhs.exponent,
-            };
-            vec![self, negative_rhs]
-        }
     }
 }
 
@@ -278,27 +314,6 @@ impl Div<Quantity> for BaseUnit {
     type Output = Quantity;
     fn div(self, rhs: Quantity) -> Self::Output {
         rhs / self
-    }
-}
-
-impl Mul for Dimension {
-    type Output = Vec<Dimension>;
-    fn mul(self, rhs: Self) -> Self::Output {
-        if self.base == rhs.base {
-            if self.exponent == -rhs.exponent {
-                vec![Dimension {
-                    base: BaseDimension::Unitless,
-                    exponent: 0,
-                }]
-            } else {
-                vec![Dimension {
-                    base: self.base,
-                    exponent: self.exponent + rhs.exponent,
-                }]
-            }
-        } else {
-            vec![self, rhs]
-        }
     }
 }
 
@@ -495,33 +510,50 @@ impl Sub<Result<Quantity>> for Quantity {
 }
 
 macro_rules! create_base_unit {
-    ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr, $exponent: expr) => {
+    ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr) => {
         pub static $name: BaseUnit = BaseUnit {
-            base_dimension: Dimension {
-                base: $dimension,
-                exponent: $exponent,
-            },
+            base_dimension: $dimension,
             symbol: $symbol,
             conversion_factor: $conversion_factor,
         };
     };
 }
 
-create_base_unit!(UNITLESS, "", BaseDimension::Unitless, 0., 0);
+create_base_unit!(
+    UNITLESS,
+    "",
+    dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 0, 0),
+    0.
+);
 
 macro_rules! create_length_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::Length, $conversion_factor, 1);
+        create_base_unit!(
+            $name,
+            $symbol,
+            dimension_fingerprint!(1, 0, 0, 0, 0, 0, 0, 0, 0),
+            $conversion_factor
+        );
     };
 }
 macro_rules! create_mass_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::Mass, $conversion_factor, 1);
+        create_base_unit!(
+            $name,
+            $symbol,
+            dimension_fingerprint!(0, 1, 0, 0, 0, 0, 0, 0, 0),
+            $conversion_factor
+        );
     };
 }
 macro_rules! create_time_unit {
     ($name: ident, $symbol: expr, $conversion_factor: expr) => {
-        create_base_unit!($name, $symbol, BaseDimension::Time, $conversion_factor, 1);
+        create_base_unit!(
+            $name,
+            $symbol,
+            dimension_fingerprint!(0, 0, 1, 0, 0, 0, 0, 0, 0),
+            $conversion_factor
+        );
     };
 }
 
@@ -530,9 +562,8 @@ macro_rules! create_temperature_unit {
         create_base_unit!(
             $name,
             $symbol,
-            BaseDimension::Temperature,
-            $conversion_factor,
-            1
+            dimension_fingerprint!(0, 0, 0, 1, 0, 0, 0, 0, 0),
+            $conversion_factor
         );
     };
 }
@@ -542,9 +573,8 @@ macro_rules! create_current_unit {
         create_base_unit!(
             $name,
             $symbol,
-            BaseDimension::Current,
-            $conversion_factor,
-            1
+            dimension_fingerprint!(0, 0, 0, 0, 1, 0, 0, 0, 0),
+            $conversion_factor
         );
     };
 }
@@ -554,9 +584,8 @@ macro_rules! create_angular_distance_unit {
         create_base_unit!(
             $name,
             $symbol,
-            BaseDimension::AngularDistance,
-            $conversion_factor,
-            1
+            dimension_fingerprint!(0, 0, 0, 0, 0, 1, 0, 0, 0),
+            $conversion_factor
         );
     };
 }
@@ -565,9 +594,8 @@ macro_rules! create_solid_angle_unit {
         create_base_unit!(
             $name,
             $symbol,
-            BaseDimension::SolidAngle,
-            $conversion_factor,
-            1
+            dimension_fingerprint!(0, 0, 0, 0, 0, 0, 1, 0, 0),
+            $conversion_factor
         );
     };
 }
@@ -577,9 +605,8 @@ macro_rules! create_luminous_intensity_unit {
         create_base_unit!(
             $name,
             $symbol,
-            BaseDimension::LuminousIntensity,
-            $conversion_factor,
-            1
+            dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 1, 0),
+            $conversion_factor
         );
     };
 }
@@ -589,9 +616,8 @@ macro_rules! create_amount_of_substance_unit {
         create_base_unit!(
             $name,
             $symbol,
-            BaseDimension::AmountOfSubstance,
-            $conversion_factor,
-            1
+            dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 0, 1),
+            $conversion_factor
         );
     };
 }
@@ -838,7 +864,7 @@ mod tests {
     #[test]
     fn test_printing_quantities() {
         let quant = 5. * MEGAPARSEC / SECOND;
-        assert_eq!(quant.to_string(), "5 Mpc s⁻¹")
+        assert_eq!(quant.to_string(), "5 s⁻¹ Mpc")
     }
 
     #[test]
