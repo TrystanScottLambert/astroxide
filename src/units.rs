@@ -629,7 +629,7 @@ macro_rules! si {
 }
 
 si!(METER, "m", 1., create_length_unit);
-create_length_unit!(ANGSTROM, "Å", 1e10); // Adding missing Angstrom
+create_length_unit!(ANGSTROM, "Å", 1e-10); // Adding missing Angstrom
 // Astronomical Length Units
 si!(ASTRONOMICAL_UNIT, "AU", 1.496e11, create_length_unit);
 si!(LIGHTYEAR, "lyr", 9.5e15, create_length_unit);
