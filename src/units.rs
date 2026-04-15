@@ -18,15 +18,15 @@ pub enum UnitError {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Dimension {
-    length: i32,
-    mass: i32,
-    time: i32,
-    temperature: i32,
-    current: i32,
-    angular_distance: i32,
-    solid_angle: i32,
-    luminous_intensity: i32,
-    amount_of_substance: i32,
+    pub length: i32,
+    pub mass: i32,
+    pub time: i32,
+    pub temperature: i32,
+    pub current: i32,
+    pub angular_distance: i32,
+    pub solid_angle: i32,
+    pub luminous_intensity: i32,
+    pub amount_of_substance: i32,
 }
 
 macro_rules! dimension_fingerprint {
@@ -46,8 +46,14 @@ macro_rules! dimension_fingerprint {
 }
 
 impl Dimension {
-    fn new() -> Self {
+    pub fn new() -> Self {
         dimension_fingerprint!(0, 0, 0, 0, 0, 0, 0, 0, 0)
+    }
+}
+
+impl Default for Dimension {
+    fn default() -> Self {
+        Dimension::new()
     }
 }
 
@@ -327,7 +333,7 @@ impl Mul for BaseUnit {
 impl Mul for Unit {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
-        let mut new_units = rhs.base_units.clone();
+        let mut new_units = rhs.base_units;
 
         for (base_unit, exponent) in self.base_units {
             new_units
