@@ -847,6 +847,10 @@ mod tests {
     fn test_derived_equivalence() {
         let a = 5. * HERTZ;
         let b = a.to((1. / HOUR).unit);
-        assert_eq!(b.value, 18000.)
+        assert_eq!(b.value, 18000.);
+
+        let a = 2. * SOLAR_LUM;
+        let b = a.to(WATT);
+        assert_eq!(b.value, 7.656e26);
     }
 }
