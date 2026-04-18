@@ -95,20 +95,42 @@ use std::{
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
+/// The dimensional "finger print" which defines the dimensionality of a unit.
+///
+/// This struct fully characterizes the dimensinality of unit which is essential for making sure
+/// that units of the same dimensionality can be added or subtracted or converted to one another.
+///
+/// For example a speed of 5 km/hour and a speed of 10 miles/hour can be added togther and coverted
+/// to one another because they both have a dimensionality of L<sup>1</sup> T<sup>-1</sup> (Length
+/// over time). The `Dimension` Struct captures this.
+///
+/// It is worth noting that "angular distance" and "solid angle" are not, strictly speaking,
+/// dimensions. However, for astronomical purposes which deal frequently with spherical
+/// trigonometry, it is useful to treat them as such.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Dimension {
+    /// scaling of "Length"" dimension.
     pub length: i32,
+    /// scaling of "Mass" dimension.
     pub mass: i32,
+    /// scaling of "Time" dimension.
     pub time: i32,
+    /// scaling of "Temperature" dimension.
     pub temperature: i32,
+    /// scaling of "Current" dimension.
     pub current: i32,
+    /// scaling of "angular distance" dimension.
     pub angular_distance: i32,
+    /// scaling of "solid angle" dimension.
     pub solid_angle: i32,
+    /// scaling of "Luminsou Intensity" dimension.
     pub luminous_intensity: i32,
+    /// scaling of "amount of substance" dimension.
     pub amount_of_substance: i32,
 }
 
 impl Dimension {
+    /// Helper method for creating a Dimensionless Dimension.
     pub const ZERO: Dimension = Dimension {
         length: 0,
         mass: 0,
@@ -120,6 +142,7 @@ impl Dimension {
         luminous_intensity: 0,
         amount_of_substance: 0,
     };
+    /// New method which creates an empty dimension.
     pub fn new() -> Self {
         Self::ZERO
     }
@@ -181,10 +204,26 @@ impl Sub for Dimension {
     }
 }
 
+/// Building block unit which can make more complex units.
+///
+/// Base units represent the indivisible units which make up other units and include the symbol for
+/// the units, their dimensionality and their conversion factors to some arbitary unit within that
+/// dimension.
+///
+/// For example. A unit like km/s is made up of two base units: kilometer and second which have the
+/// symbols "km" and "s" with dimensions L and T respectively. Other units which can be made up of
+/// other units can also be considered base units. A base unit for energy, for example, would be
+/// Joule which has the symbol "J" and the dimensions of M L<sup>2</sup> T<sup>-2</sup>. But an
+/// equivalent unit is kg m<sup>2</sup> s<sup>-2</sup>.
+///
+/// So base units are specifically modeling the unit representations which can be combined with other units to make new units and NOT units with a single dimensionality.
 #[derive(Debug, Clone, Copy)]
 pub struct BaseUnit {
+    /// Dimensional finger print of unit.
     pub base_dimension: Dimension,
+    /// The symbol represntation of the unit e.g., "km", "s", "Mpc".
     pub symbol: &'static str,
+    /// The conversion factor to some arbitary common value for that dimensionality. Usually the SI standard.
     pub conversion_factor: f64,
 }
 
