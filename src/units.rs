@@ -318,7 +318,11 @@ impl Div<BaseUnit> for Quantity {
 impl Div<Quantity> for BaseUnit {
     type Output = Quantity;
     fn div(self, rhs: Quantity) -> Self::Output {
-        rhs / self
+        let new_unit = self.as_unit() / rhs.unit;
+        Quantity {
+            value: 1. / rhs.value,
+            unit: new_unit,
+        }
     }
 }
 
