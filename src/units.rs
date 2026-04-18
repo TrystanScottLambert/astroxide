@@ -1,5 +1,6 @@
 use colored::Colorize;
 use fmtastic::Superscript;
+use libm::exp;
 use paste::paste;
 use std::cmp::Ordering;
 use std::{
@@ -143,15 +144,16 @@ pub trait UnitLike {
 
 impl Display for Unit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string_reprs: Vec<String> = self
-            .base_units
-            .iter()
-            .map(|(base_unit, &exponent)| match exponent {
-                1 => base_unit.symbol.to_string(),
-                _ => format!("{}{}", base_unit.symbol, Superscript(exponent)),
-            })
-            .collect();
-        write!(f, "{}", string_reprs.join(" "))
+        for (i, (base_unit, &exponent)) in self.base_units.iter().enumerate() {
+            if i > 0 {
+                write!(f, " ")?;
+            }
+            match exponent {
+                1 => write!(f, "{}", base_unit.symbol)?,
+                _ => write!(f, "{}{}", base_unit.symbol, Superscript(exponent))?,
+            }
+        }
+        Ok(())
     }
 }
 impl Unit {
