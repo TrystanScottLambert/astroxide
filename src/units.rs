@@ -520,10 +520,82 @@ impl Display for CosmoValue {
     }
 }
 
+pub struct h(i32);
+
+impl Mul<f64> for h {
+    type Output = CosmoValue;
+    fn mul(self, rhs: f64) -> Self::Output {
+        CosmoValue::new(rhs, self.0)
+    }
+}
+
+impl Mul<h> for f64 {
+    type Output = CosmoValue;
+    fn mul(self, rhs: h) -> Self::Output {
+        CosmoValue::new(self, rhs.0)
+    }
+}
+
+impl Mul for h {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        h(self.0 + rhs.0)
+    }
+}
+
+impl Mul<CosmoValue> for h {
+    type Output = CosmoValue;
+    fn mul(self, rhs: CosmoValue) -> Self::Output {
+        CosmoValue::new(rhs.value, rhs.h_dependency + self.0)
+    }
+}
+
+impl Mul<h> for CosmoValue {
+    type Output = CosmoValue;
+    fn mul(self, rhs: h) -> Self::Output {
+        CosmoValue::new(self.value, self.h_dependency + rhs.0)
+    }
+}
+
+impl Div<f64> for h {
+    type Output = CosmoValue;
+    fn div(self, rhs: f64) -> Self::Output {
+        CosmoValue::new(1. / rhs, self.0)
+    }
+}
+
+impl Div<h> for f64 {
+    type Output = CosmoValue;
+    fn div(self, rhs: h) -> Self::Output {
+        CosmoValue::new(self, -rhs.0)
+    }
+}
+
+impl Div for h {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        h(self.0 - rhs.0)
+    }
+}
+
+impl Div<h> for CosmoValue {
+    type Output = CosmoValue;
+    fn div(self, rhs: h) -> Self::Output {
+        CosmoValue::new(self.value, self.h_dependency - rhs.0)
+    }
+}
+
+impl Div<CosmoValue> for h {
+    type Output = CosmoValue;
+    fn div(self, rhs: CosmoValue) -> Self::Output {
+        CosmoValue::new(1. / rhs.value, self.0 - rhs.h_dependency)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CosmoQuantity {
-    cosmo_value: CosmoValue,
-    unit: Unit,
+    pub cosmo_value: CosmoValue,
+    pub unit: Unit,
 }
 
 impl CosmoQuantity {
@@ -1078,7 +1150,7 @@ mod tests {
         assert_eq!(different_units, answer);
     }
     #[test]
-    #[should_panic]
+    // #[should_panic]
     fn test_print() {
         let little_h = 0.7;
         let plain = 1. * MEGAPARSEC;
@@ -1086,6 +1158,10 @@ mod tests {
 
         println!("Value assuming h={little_h}: {plain}");
         println!("Value with {}: {}", "h".italic(), cosmo);
+
+        let new_cosmo = 0.7 * h(-1) * MEGAPARSEC;
+        println!("{new_cosmo}");
+
         panic!()
     }
 }
