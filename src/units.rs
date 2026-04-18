@@ -470,7 +470,7 @@ impl Add for Quantity {
             + rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
         Quantity {
-            unit: self.unit.clone(),
+            unit: self.unit,
             value: new_value,
         }
     }
@@ -1001,9 +1001,9 @@ mod tests {
         let b = (3. * HOUR) * (5. * METER);
         let c = a.clone() + b.clone();
         let d = b.clone() - a.clone();
-        assert!((c.clone().value - 54015.).abs() < 1e-12);
+        assert!((c.value - 54015.).abs() < 1e-12);
         assert_eq!(c.unit, a.unit);
-        assert!((d.clone().value - 14.99583333).abs() < 1e-7);
+        assert!((d.value - 14.99583333).abs() < 1e-7);
         assert_eq!(d.unit, b.unit);
     }
 
@@ -1149,12 +1149,12 @@ mod tests {
         let answer = CosmoQuantity::new(4.4, -1, MEGAPARSEC);
         assert_eq!(mul_add, answer);
 
-        let mul_sub = a.clone() - b.clone() - c.clone();
+        let mul_sub = a.clone() - b - c;
         let answer = CosmoQuantity::new(-2.4, -1, MEGAPARSEC);
         assert!(mul_sub.approx_eq(answer));
 
         let d = CosmoQuantity::new(2., -1, GIGAPARSEC);
-        let add_different_units = d.clone() + a.clone();
+        let add_different_units = d + a;
         let answer = CosmoQuantity::new(2.001, -1, GIGAPARSEC);
         assert_eq!(add_different_units, answer);
     }
@@ -1179,7 +1179,7 @@ mod tests {
         let answer = CosmoQuantity::new(1.89, -3, MEGAPARSEC * MEGAPARSEC * MEGAPARSEC);
         assert_eq!(mul_mul, answer);
 
-        let mul_div = (a.clone() / b.clone()) / c.clone();
+        let mul_div = (a.clone() / b) / c;
         let answer = CosmoQuantity::new(0.5291005291, 1, (1. / MEGAPARSEC).unit);
         assert!(mul_div.approx_eq(answer));
 
