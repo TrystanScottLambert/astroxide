@@ -247,8 +247,27 @@ impl PartialEq for BaseUnit {
 
 impl Eq for BaseUnit {}
 
+/// Unit represntation.
+///
+/// Units are represented as a simple BTreeMap of Base Units and their exponents. This allows for
+/// any arbitary unit to be manually defined from the base units that exist. For example, square
+/// meters are simply (meters: 2) whereas mpc would be defined as (mile: 1, hour: -1).
+///
+/// This allows us to compare if units are equal as well as quickly derived the dimensionality of a
+/// unit, taking into account the exponents of the base units. So we can say that square feet and
+/// square meters are not the same unit (foot: 2) != (meter: 2), do have the same dimensionality.
 #[derive(Debug, Clone)]
 pub struct Unit {
+    /// Mapping of Base units and their corresponding exponents.
+    /// e.g. km/s would be `BTreeMap::from([(KILOMETER, 1), (SECOND, -1)])` which would be
+    /// equivalent to `KILOMETER/SECOND`.
+    /// ```
+    /// use astroxide::units::*;
+    /// use std::collections::BTreeMap;
+    /// let unit_a = Unit {base_units: BTreeMap::from([(KILOMETER, 1), (SECOND, -1)])};
+    /// let unit_b = KILOMETER/SECOND;
+    /// assert_eq!(unit_a, unit_b);
+    /// ```
     pub base_units: BTreeMap<BaseUnit, i32>,
 }
 
