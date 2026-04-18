@@ -679,7 +679,7 @@ impl Neg for CosmoQuantity {
                 value: -self.cosmo_value.value,
                 h_dependency: self.cosmo_value.h_dependency,
             },
-            unit: self.unit.clone(),
+            unit: self.unit,
         }
     }
 }
