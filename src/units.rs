@@ -520,6 +520,7 @@ impl Display for CosmoValue {
     }
 }
 
+#[allow(non_camel_case_types)]
 pub struct h(i32);
 
 impl Mul<f64> for h {
@@ -1150,7 +1151,7 @@ mod tests {
         assert_eq!(different_units, answer);
     }
     #[test]
-    // #[should_panic]
+    #[should_panic]
     fn test_print() {
         let little_h = 0.7;
         let plain = 1. * MEGAPARSEC;
