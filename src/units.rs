@@ -176,7 +176,13 @@ impl Unit {
 }
 
 impl Quantity {
-    pub fn to(&self, target_unit: impl UnitLike) -> Quantity {
+    pub fn new(value: f64, unit: impl UnitLike) -> Self {
+        Self {
+            value,
+            unit: unit.as_unit(),
+        }
+    }
+    pub fn to(&self, target_unit: impl UnitLike) -> Self {
         if self.unit.dimensions() != target_unit.as_unit().dimensions() {
             panic!(
                 "Cannot convert {} to {} since they have different dimensions.",
@@ -465,7 +471,15 @@ impl Add for Quantity {
     }
 }
 
-// TODO: Add Neg for quantity
+impl Neg for Quantity {
+    type Output = Quantity;
+    fn neg(self) -> Self::Output {
+        Quantity {
+            value: -self.value,
+            unit: self.unit,
+        }
+    }
+}
 
 impl Sub for Quantity {
     type Output = Self;
@@ -476,13 +490,7 @@ impl Sub for Quantity {
                 self.unit, rhs.unit,
             )
         }
-        let new_value = (self.value * self.unit.calculate_conversion_factor()
-            - rhs.value * rhs.unit.calculate_conversion_factor())
-            / self.unit.calculate_conversion_factor();
-        Quantity {
-            unit: self.unit.clone(),
-            value: new_value,
-        }
+        self + (-rhs)
     }
 }
 
@@ -1181,6 +1189,15 @@ mod tests {
         let answer = CosmoQuantity::new(0.5, 0, MEGAPARSEC / SECOND);
         assert_eq!(different_units, answer);
     }
+
+    #[test]
+    fn test_converting_units() {
+        let a = 0.7 * MEGAPARSEC;
+        let b = a.switch_cosmologies(0.7, 0.6, -1);
+        let answer = Quantity::new(0.6, MEGAPARSEC);
+        assert_eq!(b.value, 0.6)
+    }
+
     #[test]
     // #[should_panic]
     fn test_print() {
