@@ -2,11 +2,10 @@ use colored::Colorize;
 use fmtastic::Superscript;
 use paste::paste;
 use std::cmp::Ordering;
-use std::ops::Neg;
 use std::{
     collections::BTreeMap,
     fmt::{self, Display},
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, Div, Mul, Neg, Sub},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -77,6 +76,7 @@ impl Add for Dimension {
         }
     }
 }
+
 impl Sub for Dimension {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
@@ -201,6 +201,10 @@ impl Quantity {
             cosmo_value,
             unit: self.unit.clone(),
         }
+    }
+    pub fn switch_cosmologies(&self, from_h: f64, to_h: f64, h_dependency: i32) -> Self {
+        let with_h = self.factor_out_h(from_h, h_dependency);
+        with_h.factor_in_h(to_h)
     }
 }
 
@@ -463,6 +467,8 @@ impl Add for Quantity {
         }
     }
 }
+
+// TODO: Add Neg for quantity
 
 impl Sub for Quantity {
     type Output = Self;
