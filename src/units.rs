@@ -870,6 +870,8 @@ macro_rules! dim {
 
 macro_rules! create_base_unit {
     ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr) => {
+        #[doc = "Base Unit representation for "]
+        #[doc=$symbol]
         pub static $name: BaseUnit = BaseUnit {
             base_dimension: $dimension,
             symbol: $symbol,
@@ -938,7 +940,7 @@ macro_rules! si {
             $create_macro!([<DECI $base_unit>], concat!("d", $base_symbol), 1e-1 * $base_conversion);
             $create_macro!([<CENTI $base_unit>], concat!("c", $base_symbol), 1e-2 * $base_conversion);
             $create_macro!([<MILLI $base_unit>], concat!("m", $base_symbol), 1e-3 * $base_conversion);
-            $create_macro!([<MICRO $base_unit>], concat!("u", $base_symbol), 1e-6 * $base_conversion);
+            $create_macro!([<MICRO $base_unit>], concat!("μ", $base_symbol), 1e-6 * $base_conversion);
             $create_macro!([<NANO $base_unit>], concat!("n", $base_symbol), 1e-9 * $base_conversion);
             $create_macro!([<PICO $base_unit>], concat!("p", $base_symbol), 1e-12 * $base_conversion);
             $create_macro!([<FEMTO $base_unit>], concat!("f", $base_symbol), 1e-15 * $base_conversion);
