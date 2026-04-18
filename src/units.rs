@@ -193,14 +193,11 @@ impl Quantity {
         }
     }
     pub fn factor_out_h(&self, h_value: f64, h_dependency: i32) -> CosmoQuantity {
-        let cosmo_value = CosmoValue {
-            value: self.value / (h_value.powi(h_dependency)),
+        CosmoQuantity::new(
+            self.value / (h_value.powi(h_dependency)),
             h_dependency,
-        };
-        CosmoQuantity {
-            cosmo_value,
-            unit: self.unit.clone(),
-        }
+            self.unit.clone(),
+        )
     }
     pub fn switch_cosmologies(&self, from_h: f64, to_h: f64, h_dependency: i32) -> Self {
         let with_h = self.factor_out_h(from_h, h_dependency);
