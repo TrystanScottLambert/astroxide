@@ -1204,7 +1204,6 @@ mod tests {
     }
 
     #[test]
-    // #[should_panic]
     fn test_print() {
         let little_h = 0.7;
         let plain = 1.78 * MEGAPARSEC;
@@ -1234,7 +1233,5 @@ mod tests {
         println!("Mass assuming h=0.7: {mass}");
         println!("Mass with h factored out: {h_mass}");
         println!("Mass assuming h=0.67: {mass_067}");
-
-        panic!()
     }
 }
