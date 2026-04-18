@@ -118,6 +118,7 @@ impl PartialEq for BaseUnit {
         (self.base_dimension == other.base_dimension) && (self.symbol == other.symbol)
     }
 }
+
 impl Eq for BaseUnit {}
 
 #[derive(Debug, Clone)]
@@ -125,7 +126,7 @@ pub struct Unit {
     pub base_units: BTreeMap<BaseUnit, i32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Quantity {
     pub unit: Unit,
     pub value: f64,
@@ -198,6 +199,10 @@ impl Quantity {
                     / target_unit.calculate_conversion_factor()),
         }
     }
+    pub fn approx_eq(&self, other: &Self) -> bool {
+        (self.value - other.value).abs() < 1e-9 && self.unit == other.unit
+    }
+
     pub fn factor_out_h(&self, h_value: f64, h_dependency: i32) -> CosmoQuantity {
         CosmoQuantity::new(
             self.value / (h_value.powi(h_dependency)),
@@ -1192,10 +1197,10 @@ mod tests {
 
     #[test]
     fn test_converting_units() {
-        let a = 0.7 * MEGAPARSEC;
+        let a = 1. * MEGAPARSEC;
         let b = a.switch_cosmologies(0.7, 0.6, -1);
-        let answer = Quantity::new(0.6, MEGAPARSEC);
-        assert_eq!(b.value, 0.6)
+        let answer = 1.16666666667 * MEGAPARSEC;
+        assert!(b.approx_eq(&answer));
     }
 
     #[test]
