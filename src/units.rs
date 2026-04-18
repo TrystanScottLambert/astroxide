@@ -1158,17 +1158,33 @@ mod tests {
         assert_eq!(different_units, answer);
     }
     #[test]
-    #[should_panic]
+    // #[should_panic]
     fn test_print() {
         let little_h = 0.7;
-        let plain = 1. * MEGAPARSEC;
+        let plain = 1.78 * MEGAPARSEC;
         let cosmo = plain.factor_out_h(little_h, -1);
 
         println!("Value assuming h={little_h}: {plain}");
         println!("Value with {}: {}", "h".italic(), cosmo);
 
-        let new_cosmo = 0.7 * h(-1) * MEGAPARSEC;
-        println!("{new_cosmo}");
+        let len_1 = 5. * h(-1) * MEGAPARSEC;
+        let len_2 = 5. * h(-1) * MEGAPARSEC;
+        let len_3 = 5. * h(-1) * MEGAPARSEC;
+        let volume = len_1 * len_2 * len_3;
+        println!("Volume with h: {volume}");
+        println!(
+            "Volume assuming h={}: {}",
+            little_h,
+            volume.factor_in_h(little_h)
+        );
+
+        let mass = 5. * SOLAR_MASS;
+        let h_mass = mass.factor_out_h(little_h, -1);
+        let mass_067 = h_mass.factor_in_h(0.67);
+
+        println!("Mass assuming h=0.7: {mass}");
+        println!("Mass with h factored out: {h_mass}");
+        println!("Mass assuming h=0.67: {mass_067}");
 
         panic!()
     }
