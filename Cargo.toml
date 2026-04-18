@@ -7,6 +7,7 @@ license = "MIT"
 
 
 [dependencies]
+colored = "3.1.1"
 fmtastic = "0.2.2"
 kiddo = "5.2.2"
 libm = "0.2.15"

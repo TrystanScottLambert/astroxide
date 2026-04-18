@@ -1,4 +1,6 @@
+use colored::Colorize;
 use fmtastic::Superscript;
+use libm::j0;
 use paste::paste;
 use std::cmp::Ordering;
 use std::{
@@ -187,6 +189,16 @@ impl Quantity {
             value: self.value
                 * (self.unit.calculate_conversion_factor()
                     / target_unit.calculate_conversion_factor()),
+        }
+    }
+    pub fn factor_out_h(&self, h_value: f64, h_dependency: i32) -> CosmoQuantity {
+        let cosmo_value = CosmoValue {
+            value: self.value / (h_value.powi(h_dependency)),
+            h_dependency,
+        };
+        CosmoQuantity {
+            cosmo_value,
+            unit: self.unit.clone(),
         }
     }
 }
@@ -463,6 +475,150 @@ impl Sub for Quantity {
             unit: self.unit.clone(),
             value: new_value,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct CosmoValue {
+    value: f64,
+    h_dependency: i32,
+}
+
+impl<T: UnitLike> Mul<T> for CosmoValue {
+    type Output = CosmoQuantity;
+    fn mul(self, rhs: T) -> Self::Output {
+        CosmoQuantity {
+            cosmo_value: self,
+            unit: rhs.as_unit(),
+        }
+    }
+}
+
+impl CosmoValue {
+    pub fn new(value: f64, h_dependency: i32) -> Self {
+        Self {
+            value,
+            h_dependency,
+        }
+    }
+}
+
+impl PartialEq for CosmoValue {
+    fn eq(&self, other: &Self) -> bool {
+        (self.value - other.value).abs() < 1e-9
+    }
+}
+impl Display for CosmoValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} {}{}",
+            self.value,
+            "h".italic(),
+            Superscript(self.h_dependency)
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CosmoQuantity {
+    cosmo_value: CosmoValue,
+    unit: Unit,
+}
+
+impl CosmoQuantity {
+    pub fn new(value: f64, h_dependency: i32, unit: impl UnitLike) -> Self {
+        Self {
+            cosmo_value: CosmoValue {
+                value,
+                h_dependency,
+            },
+            unit: unit.as_unit(),
+        }
+    }
+    pub fn factor_in_h(&self, h_value: f64) -> Quantity {
+        Quantity {
+            unit: self.unit.clone(),
+            value: self.cosmo_value.value * (h_value).powi(self.cosmo_value.h_dependency),
+        }
+    }
+
+    pub fn ignore_h(&self) -> Quantity {
+        Quantity {
+            unit: self.unit.clone(),
+            value: self.cosmo_value.value,
+        }
+    }
+    pub fn negative(&self) -> CosmoQuantity {
+        CosmoQuantity {
+            cosmo_value: CosmoValue {
+                value: -self.cosmo_value.value,
+                h_dependency: self.cosmo_value.h_dependency,
+            },
+            unit: self.unit.clone(),
+        }
+    }
+    pub fn invert(&self) -> CosmoQuantity {
+        CosmoQuantity {
+            cosmo_value: CosmoValue {
+                value: 1. / self.cosmo_value.value,
+                h_dependency: -self.cosmo_value.h_dependency,
+            },
+            unit: self.unit.clone().invert(),
+        }
+    }
+}
+
+impl Display for CosmoQuantity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.cosmo_value, self.unit)
+    }
+}
+
+impl Add for CosmoQuantity {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        if self.cosmo_value.h_dependency != rhs.cosmo_value.h_dependency {
+            panic!(
+                "{} cannot be added to {} because of differing h dependencies.",
+                self, rhs
+            )
+        }
+        let quant = self.ignore_h() + rhs.ignore_h();
+        CosmoQuantity {
+            cosmo_value: CosmoValue {
+                value: quant.value,
+                h_dependency: self.cosmo_value.h_dependency,
+            },
+            unit: quant.unit,
+        }
+    }
+}
+
+impl Sub for CosmoQuantity {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + rhs.negative()
+    }
+}
+
+impl Mul for CosmoQuantity {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self::Output {
+        CosmoQuantity {
+            cosmo_value: CosmoValue {
+                value: self.cosmo_value.value * rhs.cosmo_value.value,
+                h_dependency: self.cosmo_value.h_dependency + rhs.cosmo_value.h_dependency,
+            },
+            unit: self.unit * rhs.unit,
+        }
+    }
+}
+
+impl Div for CosmoQuantity {
+    type Output = Self;
+    fn div(self, rhs: Self) -> Self::Output {
+        self * rhs.invert()
     }
 }
 
@@ -852,5 +1008,84 @@ mod tests {
         let a = 2. * SOLAR_LUM;
         let b = a.to(WATT);
         assert_eq!(b.value, 7.656e26);
+    }
+
+    #[test]
+    fn test_factoring_out_h() {
+        let a = 1. * MEGAPARSEC;
+        let b = a.factor_out_h(0.7, -1);
+        let c = a.factor_out_h(0.7, -2);
+        assert_eq!(b.cosmo_value.value, 0.7);
+        assert_eq!(b.unit, a.unit);
+        assert!((c.cosmo_value.value - 0.49).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_assuming_h() {
+        let a = 1. * MEGAPARSEC;
+        let b = a.factor_out_h(0.7, -1);
+        let c = b.factor_in_h(0.7);
+        assert_eq!(c.value, a.value);
+        assert_eq!(c.unit, a.unit);
+    }
+
+    #[test]
+    fn test_adding_subtracting_cosmo_units() {
+        let a = CosmoQuantity::new(1., -1, MEGAPARSEC);
+        let b = CosmoQuantity::new(0.7, -1, MEGAPARSEC);
+        let c = CosmoQuantity::new(2.7, -1, MEGAPARSEC);
+        let mul_add = a.clone() + b.clone() + c.clone();
+        let answer = CosmoQuantity::new(4.4, -1, MEGAPARSEC);
+        assert_eq!(mul_add, answer);
+
+        let mul_sub = a.clone() - b.clone() - c.clone();
+        let answer = CosmoQuantity::new(-2.4, -1, MEGAPARSEC);
+        assert_eq!(mul_sub, answer);
+
+        let d = CosmoQuantity::new(2., -1, GIGAPARSEC);
+        let add_different_units = d.clone() + a.clone();
+        let answer = CosmoQuantity::new(2.001, -1, GIGAPARSEC);
+        assert_eq!(add_different_units, answer);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_adding_wrong_h_dependencies() {
+        let _ = CosmoQuantity::new(1., -1, METER) + CosmoQuantity::new(1., -2, METER);
+    }
+    #[test]
+    #[should_panic]
+    fn test_subtracting_wrong_h_dependencies() {
+        let _ = CosmoQuantity::new(1., -1, METER) - CosmoQuantity::new(1., -2, METER);
+    }
+
+    #[test]
+    fn test_multipying_dividing_cosmo_units() {
+        let a = CosmoValue::new(1., -1) * MEGAPARSEC;
+        let b = CosmoQuantity::new(0.7, -1, MEGAPARSEC);
+        let c = CosmoQuantity::new(2.7, -1, MEGAPARSEC);
+        let mul_mul = a.clone() * b.clone() * c.clone();
+        let answer = CosmoQuantity::new(1.89, -3, MEGAPARSEC * MEGAPARSEC * MEGAPARSEC);
+        assert_eq!(mul_mul, answer);
+
+        let mul_div = (a.clone() / b.clone()) / c.clone();
+        let answer = CosmoQuantity::new(0.5291005291, 1, (1. / MEGAPARSEC).unit);
+        assert_eq!(mul_div, answer);
+
+        let d = CosmoQuantity::new(2., -1, SECOND);
+        let different_units = a / d;
+        let answer = CosmoQuantity::new(0.5, 0, MEGAPARSEC / SECOND);
+        assert_eq!(different_units, answer);
+    }
+    #[test]
+    #[should_panic]
+    fn test_print() {
+        let little_h = 0.7;
+        let plain = 1. * MEGAPARSEC;
+        let cosmo = plain.factor_out_h(little_h, -1);
+
+        println!("Value assuming h={little_h}: {plain}");
+        println!("Value with {}: {}", "h".italic(), cosmo);
+        panic!()
     }
 }
