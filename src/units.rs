@@ -1,6 +1,5 @@
 use colored::Colorize;
 use fmtastic::Superscript;
-use libm::j0;
 use paste::paste;
 use std::cmp::Ordering;
 use std::{
@@ -236,6 +235,7 @@ impl Div<BaseUnit> for BaseUnit {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Div<Unit> for Unit {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
@@ -537,6 +537,7 @@ impl Mul<h> for f64 {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Mul for h {
     type Output = Self;
     fn mul(self, rhs: Self) -> Self::Output {
@@ -544,6 +545,7 @@ impl Mul for h {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Mul<CosmoValue> for h {
     type Output = CosmoValue;
     fn mul(self, rhs: CosmoValue) -> Self::Output {
@@ -551,6 +553,7 @@ impl Mul<CosmoValue> for h {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Mul<h> for CosmoValue {
     type Output = CosmoValue;
     fn mul(self, rhs: h) -> Self::Output {
@@ -572,6 +575,7 @@ impl Div<h> for f64 {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Div for h {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
@@ -579,6 +583,7 @@ impl Div for h {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Div<h> for CosmoValue {
     type Output = CosmoValue;
     fn div(self, rhs: h) -> Self::Output {
@@ -668,6 +673,7 @@ impl Add for CosmoQuantity {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Sub for CosmoQuantity {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
@@ -688,6 +694,7 @@ impl Mul for CosmoQuantity {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
 impl Div for CosmoQuantity {
     type Output = Self;
     fn div(self, rhs: Self) -> Self::Output {
