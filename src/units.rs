@@ -478,10 +478,16 @@ impl Sub for Quantity {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CosmoValue {
     value: f64,
     h_dependency: i32,
+}
+
+impl CosmoValue {
+    pub fn approx_eq(&self, other: &Self) -> bool {
+        (self.value - other.value).abs() < 1e-9 && self.h_dependency == other.h_dependency
+    }
 }
 
 impl<T: UnitLike> Mul<T> for CosmoValue {
@@ -503,11 +509,6 @@ impl CosmoValue {
     }
 }
 
-impl PartialEq for CosmoValue {
-    fn eq(&self, other: &Self) -> bool {
-        (self.value - other.value).abs() < 1e-9
-    }
-}
 impl Display for CosmoValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -613,6 +614,9 @@ impl CosmoQuantity {
             },
             unit: unit.as_unit(),
         }
+    }
+    pub fn approx_eq(&self, other: Self) -> bool {
+        self.cosmo_value.approx_eq(&other.cosmo_value) && self.unit == other.unit
     }
     pub fn factor_in_h(&self, h_value: f64) -> Quantity {
         Quantity {
@@ -1128,7 +1132,7 @@ mod tests {
 
         let mul_sub = a.clone() - b.clone() - c.clone();
         let answer = CosmoQuantity::new(-2.4, -1, MEGAPARSEC);
-        assert_eq!(mul_sub, answer);
+        assert!(mul_sub.approx_eq(answer));
 
         let d = CosmoQuantity::new(2., -1, GIGAPARSEC);
         let add_different_units = d.clone() + a.clone();
@@ -1158,7 +1162,7 @@ mod tests {
 
         let mul_div = (a.clone() / b.clone()) / c.clone();
         let answer = CosmoQuantity::new(0.5291005291, 1, (1. / MEGAPARSEC).unit);
-        assert_eq!(mul_div, answer);
+        assert!(mul_div.approx_eq(answer));
 
         let d = CosmoQuantity::new(2., -1, SECOND);
         let different_units = a / d;
