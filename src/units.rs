@@ -174,7 +174,7 @@ impl Unit {
 }
 
 impl Quantity {
-    pub fn to(self, target_unit: impl UnitLike) -> Quantity {
+    pub fn to(&self, target_unit: impl UnitLike) -> Quantity {
         if self.unit.dimensions() != target_unit.as_unit().dimensions() {
             panic!(
                 "Cannot convert {} to {} since they have different dimensions.",
