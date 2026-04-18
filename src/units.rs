@@ -2,6 +2,7 @@ use colored::Colorize;
 use fmtastic::Superscript;
 use paste::paste;
 use std::cmp::Ordering;
+use std::ops::Neg;
 use std::{
     collections::BTreeMap,
     fmt::{self, Display},
@@ -635,15 +636,6 @@ impl CosmoQuantity {
             value: self.cosmo_value.value,
         }
     }
-    pub fn negative(&self) -> CosmoQuantity {
-        CosmoQuantity {
-            cosmo_value: CosmoValue {
-                value: -self.cosmo_value.value,
-                h_dependency: self.cosmo_value.h_dependency,
-            },
-            unit: self.unit.clone(),
-        }
-    }
     pub fn invert(&self) -> CosmoQuantity {
         CosmoQuantity {
             cosmo_value: CosmoValue {
@@ -666,6 +658,19 @@ impl CosmoQuantity {
 impl Display for CosmoQuantity {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} {}", self.cosmo_value, self.unit)
+    }
+}
+
+impl Neg for CosmoQuantity {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        CosmoQuantity {
+            cosmo_value: CosmoValue {
+                value: -self.cosmo_value.value,
+                h_dependency: self.cosmo_value.h_dependency,
+            },
+            unit: self.unit.clone(),
+        }
     }
 }
 
@@ -693,7 +698,7 @@ impl Add for CosmoQuantity {
 impl Sub for CosmoQuantity {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        self + rhs.negative()
+        self + (-rhs)
     }
 }
 
@@ -998,7 +1003,7 @@ mod tests {
         let distance_b = 2. * METER;
         let meter_distance = distance_a + distance_b;
 
-        let km_distance = meter_distance.clone().to(KILOMETER);
+        let km_distance = meter_distance.to(KILOMETER);
         let distance = 5. * METER + 1. * KILOMETER;
         assert_eq!(distance.value, 1005.);
         assert_eq!(meter_distance.value, 7.);
@@ -1027,7 +1032,7 @@ mod tests {
         let distance_b = 500. * METER;
         let distance_c = CENTIMETER * 500.;
         let test_distance = distance_a - distance_b - distance_c;
-        let test_distance_meters = test_distance.clone().to(METER);
+        let test_distance_meters = test_distance.to(METER);
         assert_eq!(test_distance.value, 4.495);
         assert_eq!(test_distance_meters.value, 4495.);
     }
@@ -1055,7 +1060,7 @@ mod tests {
         let x = 5. * KILOMETER;
         let y = 10. * SECOND;
         let velocity = x / y;
-        let velocity_mh = velocity.clone().to(METER / HOUR);
+        let velocity_mh = velocity.to(METER / HOUR);
         assert_eq!(velocity.value, 0.5);
         assert_eq!(velocity_mh.value, 1800000.)
     }
@@ -1086,12 +1091,12 @@ mod tests {
     fn testing_angular_conversions() {
         let a = 5. * RADIAN;
         let b = 2. * DEGREE;
-        assert_eq!(a.clone().to(DEGREE).value, 286.4788975654116);
-        assert_eq!(a.clone().to(ARCSECOND).value, 1031324.0312354818);
+        assert_eq!(a.to(DEGREE).value, 286.4788975654116);
+        assert_eq!(a.to(ARCSECOND).value, 1031324.0312354818);
         assert_eq!(a.to(ARCMINUTE).value, 17188.7338539247);
 
-        assert_eq!(b.clone().to(RADIAN).value, 0.03490658503988659);
-        assert_eq!(b.clone().to(ARCSECOND).value, 3600. * 2.);
+        assert_eq!(b.to(RADIAN).value, 0.03490658503988659);
+        assert_eq!(b.to(ARCSECOND).value, 3600. * 2.);
         assert_eq!(b.to(ARCMINUTE).value, 60. * 2.);
     }
 
