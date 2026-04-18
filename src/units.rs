@@ -1,3 +1,90 @@
+#![warn(missing_docs)]
+//! Crate for astronomy-specific unit support.  
+//!
+//! Many unit crates exist in rust and other programming languages, however, astronomy often
+//! requires more esoteric units (solar mass, Mpc) and other specialized unit functionality on top
+//! of general units. This crate aims to deliver a complete unit solution for astronomy.
+//!
+//! This package borrows from the [astropy.units](https://docs.astropy.org/en/stable/units/index.html) syntax so that users familar with it should already
+//! feel comfortable with how the units are implemented here. The syntax is very similar to how
+//! units are actually written on paper.
+//!
+//! The crate comes with most units built in and building a quantity (a f64 value with a unit) can
+//! be done through multiplication and division.  
+//! ```
+//! use astroxide::units::*;
+//!
+//! let distance = 5. * MEGAPARSEC;
+//! assert_eq!(distance.value, 5.);
+//! assert_eq!(distance.unit, MEGAPARSEC.as_unit());
+//! ```
+//!
+//! Units of the same dimensionality can be added and subtracted and converted to one another
+//! without worrying about the specific implementation.
+//!
+//! ```
+//! use astroxide::units::*;
+//! let speed_1 = 50. * KILOMETER/HOUR;
+//! let speed_2 = 10. * METER/SECOND;
+//! let sum = speed_1 + speed_2;
+//! let sum_mph = sum.to(MILE/HOUR);
+//! assert_eq!(sum.value, 86.);
+//! assert!((sum_mph.value -53.4379).abs() < 0.001)
+//! ```
+//!
+//! Units of differing dimensionality will panic if added, subtracted, or converted.
+//!
+//!
+//! What makes this units package novel is the handling of cosmological units. That is to say,
+//! taking into account the often dreaded ["Little h"](https://arxiv.org/pdf/1308.4150). astroxide
+//! units allow us to factor out little h from existing quantities, assume values for little h, or
+//! change cosmologies completely (In addition to all the standard conversions and dimension
+//! checking that come with standard units).  
+//!
+//! For example if a paper assumes H<sub>0</sub> = 70 and quotes a distance measurement of 1 Mpc, then you can
+//! factor out the little h dependency (assuming a standard h<sup>-1</sup> scaling for
+//! distance) which on paper would be 0.7 h<sup>-1</sup> Mpc [see this article](https://www.astro.ljmu.ac.uk/~ikb/research/h-units.html).
+//! This factored out value is a CosmoQuantity which is built of a CosmoValue (containing the little h dependency) and its exponent (-1 in this case).
+//!
+//! ```
+//! use astroxide::units::*;
+//!
+//! let distance = 1. * MEGAPARSEC;
+//! let factored_out_distance = distance.factor_out_h(0.7, -1);
+//!
+//! assert_eq!(factored_out_distance.cosmo_value.value, 0.7);
+//! assert_eq!(factored_out_distance.cosmo_value.h_dependency, -1);
+//! assert_eq!(factored_out_distance.unit, MEGAPARSEC.as_unit())
+//! ```
+//! Alternatively, if a paper instead has the dependency explicitly factored out, then we can do
+//! the reverse and adopt a specific H<sub>0</sub> value. For example if we have a mass derived
+//! from luminousity then the h scaling would go ~ h<sup>-2</sup>. We provide the little h struct
+//! as syntactic sugar for including little h scalings.
+//!
+//! ```
+//! use astroxide::units::*;
+//!
+//! let mass = 10.* h(-2) *SOLAR_MASS;
+//! let mass_70 = mass.factor_in_h(0.7); // assuming H0 = 70 km/s/Mpc
+//! assert!((mass_70.value- 20.4081632).abs() < 0.0001);
+//! assert_eq!(mass_70.unit, SOLAR_MASS.as_unit());
+//! ```
+//!
+//! Of course we can just change little h assumpions completely. If we have a volume (h<sup>-3</sup> scaling) assuming
+//! H<sub>0</sub> = 70, and want to convert that to a cosmology assuming H<sub>0</sub> = 67, then
+//! one would usually factor out the h dependency then assume a different h (which we can do above)
+//! or simpley use the switch_cosmologies method on any quantity.
+//!
+//! ```
+//! use astroxide::units::*;
+//!
+//! let volume_70 = 2000.* MEGAPARSEC * MEGAPARSEC * MEGAPARSEC;
+//! let volume_67 = volume_70.switch_cosmologies(0.7, 0.67, -3);
+//! assert!((volume_67.value - 2280.86566499).abs() < 0.0001);
+//! ```
+//!
+//!
+//!
 use colored::Colorize;
 use fmtastic::Superscript;
 use paste::paste;
@@ -537,7 +624,7 @@ impl Display for CosmoValue {
 }
 
 #[allow(non_camel_case_types)]
-pub struct h(i32);
+pub struct h(pub i32);
 
 impl Mul<f64> for h {
     type Output = CosmoValue;
