@@ -462,7 +462,7 @@ impl Add for Quantity {
     fn add(self, rhs: Self) -> Self::Output {
         if self.unit.dimensions() != rhs.unit.dimensions() {
             panic!(
-                "Cannot add units {} and {} since they have different dimensions.",
+                "Cannot add or subtract {} and {} since they have different dimensions.",
                 self.unit, rhs.unit,
             )
         }
@@ -489,12 +489,6 @@ impl Neg for Quantity {
 impl Sub for Quantity {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
-        if self.unit.dimensions() != rhs.unit.dimensions() {
-            panic!(
-                "Cannot subtract units {} and {} since they have different dimensions.",
-                self.unit, rhs.unit,
-            )
-        }
         self + (-rhs)
     }
 }
@@ -695,7 +689,7 @@ impl Add for CosmoQuantity {
     fn add(self, rhs: Self) -> Self::Output {
         if self.cosmo_value.h_dependency != rhs.cosmo_value.h_dependency {
             panic!(
-                "{} cannot be added to {} because of differing h dependencies.",
+                "Cannot add or subtract {} {} because of differing h dependencies.",
                 self, rhs
             )
         }
@@ -1027,7 +1021,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Cannot add")]
+    #[should_panic(expected = "Cannot add or subtract")]
     fn test_adding_non_equivalent_units_fails() {
         let distance = 4. * METER;
         let time = 3. * HOUR;
@@ -1035,7 +1029,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Cannot subtract")]
+    #[should_panic(expected = "Cannot add or subtract")]
     fn test_subtracting_non_equivalent_units_fails() {
         let distance = 4. * METER;
         let time = 3. * HOUR;
