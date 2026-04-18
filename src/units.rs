@@ -860,7 +860,7 @@ length!(ROD, "rod", 5.0292);
 si!(GRAM, "g", 1., mass);
 
 // Astronomical Mass Units
-mass!(SOLAR_MASS, "msun", 1.988475e33);
+mass!(SOLAR_MASS, "M☉", 1.988475e33);
 
 // Time
 si!(SECOND, "s", 1., time);
@@ -905,7 +905,7 @@ si!(PASCAL, "Pa", 1., pressure);
 si!(JOULE, "J", 1., energy);
 si!(ERG, "erg", 1e-7, energy);
 si!(WATT, "W", 1., power);
-power!(SOLAR_LUM, "Lsun", 3.828e26);
+power!(SOLAR_LUM, "L☉", 3.828e26);
 si!(COULOMB, "C", 1., charge);
 si!(VOLT, "V", 1., voltage);
 si!(OHM, "Ω", 1., resistance);
@@ -1211,7 +1211,7 @@ mod tests {
         let cosmo = plain.factor_out_h(little_h, -1);
 
         println!("Value assuming h={little_h}: {plain}");
-        println!("Value with {}: {}", "h".italic(), cosmo);
+        println!("Value with {}: {}\n", "h".italic(), cosmo);
 
         let len_1 = 5. * h(-1) * MEGAPARSEC;
         let len_2 = 5. * h(-1) * MEGAPARSEC;
@@ -1222,7 +1222,7 @@ mod tests {
         println!("Volume with h: {volume}");
         println!("Volume with h but in GPC: {volume_gpc3}");
         println!(
-            "Volume assuming h={}: {}",
+            "Volume assuming h={}: {}\n",
             little_h,
             volume.factor_in_h(little_h)
         );
