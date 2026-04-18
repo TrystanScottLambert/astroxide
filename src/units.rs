@@ -290,7 +290,7 @@ impl Div<f64> for Quantity {
     type Output = Quantity;
     fn div(self, rhs: f64) -> Self::Output {
         Quantity {
-            value: rhs / self.value,
+            value: self.value / rhs,
             unit: self.unit,
         }
     }
@@ -480,8 +480,8 @@ impl Sub for Quantity {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct CosmoValue {
-    value: f64,
-    h_dependency: i32,
+    pub value: f64,
+    pub h_dependency: i32,
 }
 
 impl CosmoValue {
