@@ -645,6 +645,14 @@ impl CosmoQuantity {
             unit: self.unit.clone().invert(),
         }
     }
+    pub fn to(&self, unit: impl UnitLike) -> CosmoQuantity {
+        let converted = self.ignore_h().to(unit);
+        CosmoQuantity::new(
+            converted.value,
+            self.cosmo_value.h_dependency,
+            converted.unit,
+        )
+    }
 }
 
 impl Display for CosmoQuantity {
@@ -1171,7 +1179,10 @@ mod tests {
         let len_2 = 5. * h(-1) * MEGAPARSEC;
         let len_3 = 5. * h(-1) * MEGAPARSEC;
         let volume = len_1 * len_2 * len_3;
+        let volume_gpc3 = volume.to(GIGAPARSEC * GIGAPARSEC * GIGAPARSEC);
+
         println!("Volume with h: {volume}");
+        println!("Volume with h but in GPC: {volume_gpc3}");
         println!(
             "Volume assuming h={}: {}",
             little_h,
