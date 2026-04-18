@@ -1,6 +1,5 @@
 use colored::Colorize;
 use fmtastic::Superscript;
-use libm::exp;
 use paste::paste;
 use std::cmp::Ordering;
 use std::{
@@ -454,7 +453,6 @@ impl Add for Quantity {
                 self.unit, rhs.unit,
             )
         }
-        assert_eq!(self.unit.dimensions(), rhs.unit.dimensions());
         let new_value = (self.value * self.unit.calculate_conversion_factor()
             + rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
