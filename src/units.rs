@@ -443,9 +443,39 @@ impl Quantity {
     /// assert!(!unit.approx_eq(&different_unit, 3));
     /// ```
     pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
-        (self.value - other.value).abs() < 0.1_f64.powi(decimal_place) && self.unit == other.unit
+        ((self.value / other.value) - 1.).abs() < 0.1_f64.powi(decimal_place)
+            && self.unit == other.unit
     }
 
+    /// Removes the assumed *h* dependency.
+    ///
+    /// Some quantities have been derived because of explicit assumptions of the cosmology that was
+    /// used in the measurement of that quantity. For example, a Mass derived from Luminosity might
+    /// well be determined to be 1.5e15 M<sub>☉</sub>. However, this quantitiy, wihthout an explicit
+    /// *h* scaling, usually means: 1. a *h*<sup>-2</sup> dependency and 2. a specific choice of *h*.
+    ///
+    /// In this example, if we knew that the assumed value of *h* was 0.7, then we could "factor
+    /// out" *h* and write the mass as the *h*-independent  7.35e14 *h*<sup>-2</sup> M<sub>☉</sub>.
+    /// This now shows the *h* scaling explicitly and allows another assumption of *h* to be used. (see [(Croton et. al., 2013)](https://arxiv.org/abs/1308.4150) and in particular "Case 4" therein.)
+    ///
+    /// In order to represent this quantity independent of any specific assumption of *h* we can
+    /// use the `factor_out_h` function to explicit factor out the h assumption [(see examples here)](voluastro.ljmu.ac.uk/~ikb/research/h-units.html)
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let mass = 1.5e15*SOLAR_MASS;
+    /// let mass_h_independent = mass.factor_out_h(0.7, -2);
+    /// let answer = 7.35e14 * h(-2) * SOLAR_MASS;
+    /// assert!(mass_h_independent.approx_eq(&answer,2));
+    ///
+    /// // exmaples from https://www.astro.ljmu.ac.uk/~ikb/research/h-units.html
+    /// let value = 1. * MEGAPARSEC;
+    /// let value_h = value.factor_out_h(0.7, -1);
+    /// let answer = 0.7 * h(-1) * MEGAPARSEC;
+    /// assert!(value_h.approx_eq(&answer, 9));
+    ///
+    /// ```
     pub fn factor_out_h(&self, h_value: f64, h_dependency: i32) -> CosmoQuantity {
         CosmoQuantity::new(
             self.value / (h_value.powi(h_dependency)),
@@ -744,7 +774,7 @@ pub struct CosmoValue {
 
 impl CosmoValue {
     pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
-        (self.value - other.value).abs() < 0.1_f64.powi(decimal_place)
+        ((self.value / other.value) - 1.).abs() < 0.1_f64.powi(decimal_place)
             && self.h_dependency == other.h_dependency
     }
 }
@@ -874,7 +904,7 @@ impl CosmoQuantity {
             unit: unit.as_unit(),
         }
     }
-    pub fn approx_eq(&self, other: Self, decimal_place: i32) -> bool {
+    pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
         self.cosmo_value
             .approx_eq(&other.cosmo_value, decimal_place)
             && self.unit == other.unit
@@ -1400,7 +1430,7 @@ mod tests {
 
         let mul_sub = a.clone() - b - c;
         let answer = CosmoQuantity::new(-2.4, -1, MEGAPARSEC);
-        assert!(mul_sub.approx_eq(answer, 9));
+        assert!(mul_sub.approx_eq(&answer, 9));
 
         let d = CosmoQuantity::new(2., -1, GIGAPARSEC);
         let add_different_units = d + a;
@@ -1430,7 +1460,7 @@ mod tests {
 
         let mul_div = (a.clone() / b) / c;
         let answer = CosmoQuantity::new(0.5291005291, 1, (1. / MEGAPARSEC).unit);
-        assert!(mul_div.approx_eq(answer, 9));
+        assert!(mul_div.approx_eq(&answer, 9));
 
         let d = CosmoQuantity::new(2., -1, SECOND);
         let different_units = a / d;
