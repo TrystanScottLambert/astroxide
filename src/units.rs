@@ -271,14 +271,30 @@ pub struct Unit {
     pub base_units: BTreeMap<BaseUnit, i32>,
 }
 
+/// Main data structure for representing values and their associated units.
+///
+/// Quantity combines f64 values and their units into one struct. This is the main way that a user
+/// would interact with data. The 'quantity' 5 km is distinct from the specific value '5' and the abtract unit 'km'.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Quantity {
+    /// The unit of the quantity represented as [Unit] struct. ('km/s' in the quantity 5 km/s).
     pub unit: Unit,
+    /// f64 value of the quantity. ('5' in the quantity 5 km/s)
     pub value: f64,
 }
 
+/// Describes things that can act like units.
+///
+/// Things that are directly convertable to units can use this trait. This is mainly used for
+/// BaseUnits to be treated as regular units. This also includes the calculation of the converson
+/// factor for the thing implementing the trait.
 pub trait UnitLike {
+    /// Conversion to a Unit which makes the thing "unitlike"
     fn as_unit(&self) -> Unit;
+    /// Default implementation which calculates the conversion factor. For example if we have
+    /// km<sup>2</2> as a Unit (which trivially implements Unitlike) then the conversion factor for
+    /// the unit would be the conversion factor of the base unit(km) to the power of the exponent
+    /// of the unit (2).
     fn calculate_conversion_factor(&self) -> f64 {
         self.as_unit()
             .base_units
@@ -302,7 +318,22 @@ impl Display for Unit {
         Ok(())
     }
 }
+
 impl Unit {
+    /// The dimensionality of the given unit.
+    ///
+    /// Every unit can be defined by its dimensonal "fingerprint". This method builds this
+    /// fingerprint from the base unit dimensions which build up the unit. This is critical for
+    /// ensuring that units of the same dimension can be added, subtracted, and converted.
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    /// use astroxide::dim;
+    ///
+    /// let x = METER/SECOND;
+    /// let dimensions = x.dimensions();
+    /// assert_eq!(dimensions, dim!(length: 1, time: -1));
+    /// ```
     pub fn dimensions(&self) -> Dimension {
         let mut full_dimension = Dimension::new();
         for (base_unit, &exponent) in &self.base_units {
@@ -310,6 +341,19 @@ impl Unit {
         }
         full_dimension
     }
+    /// Inverse of the Unit.
+    ///
+    /// This is equivalent to return the unit to the power of -1.
+    /// For example, if we have the unit "km/s" then the inverse would return "s/km".
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let x = METER/SECOND;
+    /// let x_inverse = x.invert();
+    /// assert_eq!(x_inverse, SECOND/METER);
+    /// ```
+    /// This is helpful for implementing divisions.
+    ///
     pub fn invert(&self) -> Self {
         let mut inverted = BTreeMap::new();
         for (base_unit, exponent) in &self.base_units {
@@ -322,12 +366,38 @@ impl Unit {
 }
 
 impl Quantity {
+    /// Creates a new Quantity object.
+    ///
+    /// This is the explicit way to create a Quantity object which can be useful but is fully
+    /// equivalent to the syntactic sugar of multiplying the unit by a f64.
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let unit_1 = 5. * METER;
+    /// let unit_2 = Quantity::new(5., METER);
+    /// assert_eq!(unit_1, unit_2);
+    /// ```
     pub fn new(value: f64, unit: impl UnitLike) -> Self {
         Self {
             value,
             unit: unit.as_unit(),
         }
     }
+    /// Conversion from one unit to an equivalent unit.
+    ///
+    /// Core functionality of [Quantity] is to allow conversion from one unit to an equivalent
+    /// one. This is done using the `to` method which is will panic if the units do not have the
+    /// same dimensionality.
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let speed = 5.* METER/SECOND;
+    /// let speed_mph = speed.to(MILE/HOUR);
+    /// let answer = 11.1847*(MILE/HOUR);
+    /// assert!(speed_mph.approx_eq(&answer, 3));
+    /// ```
     pub fn to(&self, target_unit: impl UnitLike) -> Self {
         if self.unit.dimensions() != target_unit.as_unit().dimensions() {
             panic!(
@@ -344,8 +414,8 @@ impl Quantity {
                     / target_unit.calculate_conversion_factor()),
         }
     }
-    pub fn approx_eq(&self, other: &Self) -> bool {
-        (self.value - other.value).abs() < 1e-9 && self.unit == other.unit
+    pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
+        (self.value - other.value).abs() < 0.1_f64.powi(decimal_place) && self.unit == other.unit
     }
 
     pub fn factor_out_h(&self, h_value: f64, h_dependency: i32) -> CosmoQuantity {
@@ -645,8 +715,9 @@ pub struct CosmoValue {
 }
 
 impl CosmoValue {
-    pub fn approx_eq(&self, other: &Self) -> bool {
-        (self.value - other.value).abs() < 1e-9 && self.h_dependency == other.h_dependency
+    pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
+        (self.value - other.value).abs() < 0.1_f64.powi(decimal_place)
+            && self.h_dependency == other.h_dependency
     }
 }
 
@@ -775,8 +846,10 @@ impl CosmoQuantity {
             unit: unit.as_unit(),
         }
     }
-    pub fn approx_eq(&self, other: Self) -> bool {
-        self.cosmo_value.approx_eq(&other.cosmo_value) && self.unit == other.unit
+    pub fn approx_eq(&self, other: Self, decimal_place: i32) -> bool {
+        self.cosmo_value
+            .approx_eq(&other.cosmo_value, decimal_place)
+            && self.unit == other.unit
     }
     pub fn factor_in_h(&self, h_value: f64) -> Quantity {
         Quantity {
@@ -878,6 +951,7 @@ impl Div for CosmoQuantity {
     }
 }
 
+#[macro_export]
 macro_rules! dim {
     ($($field:ident: $value:expr),* $(,)?) => {
         Dimension {
@@ -1298,7 +1372,7 @@ mod tests {
 
         let mul_sub = a.clone() - b - c;
         let answer = CosmoQuantity::new(-2.4, -1, MEGAPARSEC);
-        assert!(mul_sub.approx_eq(answer));
+        assert!(mul_sub.approx_eq(answer, 9));
 
         let d = CosmoQuantity::new(2., -1, GIGAPARSEC);
         let add_different_units = d + a;
@@ -1328,7 +1402,7 @@ mod tests {
 
         let mul_div = (a.clone() / b) / c;
         let answer = CosmoQuantity::new(0.5291005291, 1, (1. / MEGAPARSEC).unit);
-        assert!(mul_div.approx_eq(answer));
+        assert!(mul_div.approx_eq(answer, 9));
 
         let d = CosmoQuantity::new(2., -1, SECOND);
         let different_units = a / d;
@@ -1341,7 +1415,7 @@ mod tests {
         let a = 1. * MEGAPARSEC;
         let b = a.switch_cosmologies(0.7, 0.6, -1);
         let answer = 1.16666666667 * MEGAPARSEC;
-        assert!(b.approx_eq(&answer));
+        assert!(b.approx_eq(&answer, 9));
     }
 
     #[test]
