@@ -387,8 +387,7 @@ impl Quantity {
     /// Conversion from one unit to an equivalent unit.
     ///
     /// Core functionality of [Quantity] is to allow conversion from one unit to an equivalent
-    /// one. This is done using the `to` method which is will panic if the units do not have the
-    /// same dimensionality.
+    /// one. This is done using the `to` method.
     ///
     /// ```
     /// use astroxide::units::*;
@@ -397,6 +396,13 @@ impl Quantity {
     /// let speed_mph = speed.to(MILE/HOUR);
     /// let answer = 11.1847*(MILE/HOUR);
     /// assert!(speed_mph.approx_eq(&answer, 3));
+    /// ```
+    /// `.to` will result in a panic if the units do not have the dame dimensionality.
+    /// ```should_panic(expected = Cannot convert)
+    /// use astroxide::units::*;
+    /// let speed = 5. *MEGAPARSEC/HOUR;
+    /// let area = GIGAPARSEC*GIGAPARSEC;
+    /// let conversion = speed.to(area); // non-physical conversion.
     /// ```
     pub fn to(&self, target_unit: impl UnitLike) -> Self {
         if self.unit.dimensions() != target_unit.as_unit().dimensions() {
@@ -414,6 +420,28 @@ impl Quantity {
                     / target_unit.calculate_conversion_factor()),
         }
     }
+    /// Approximately equal method for a given decimal precision.
+    ///
+    /// Helper method for determining if two quantities are approximately equal. Since units are
+    /// only using f64 floating point errors can occur. In addition there are some use cases where
+    /// absolute precision is not possible (comparison to other quantities in other works with
+    /// different significant figures for example.), Here decimal_place refers to up to what
+    /// decimal should be included in the comparison.
+    ///
+    /// Units are included in the comparison, so even if the values are within the tolerance,
+    /// non-equal units will result in a "false".
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let x = 5.* METER;
+    /// let y = 5.001 * METER;
+    /// assert!(x.approx_eq(&y, 2));
+    ///
+    /// let unit = 5. * METER;
+    /// let different_unit = 5. * KILOMETER;
+    /// assert!(!unit.approx_eq(&different_unit, 3));
+    /// ```
     pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
         (self.value - other.value).abs() < 0.1_f64.powi(decimal_place) && self.unit == other.unit
     }
