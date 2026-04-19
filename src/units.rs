@@ -1,4 +1,6 @@
 #![warn(missing_docs)]
+#![warn(clippy::pedantic)]
+
 //! Crate for astronomy-specific unit support.  
 //!
 //! Many unit crates exist in rust and other programming languages, however, astronomy often
@@ -44,7 +46,7 @@
 //! For example if a paper assumes H<sub>0</sub> = 70 and quotes a distance measurement of 1 Mpc, then you can
 //! factor out the little h dependency (assuming a standard h<sup>-1</sup> scaling for
 //! distance) which on paper would be 0.7 h<sup>-1</sup> Mpc [see this article](https://www.astro.ljmu.ac.uk/~ikb/research/h-units.html).
-//! This factored out value is a CosmoQuantity which is built of a CosmoValue (containing the little h dependency) and its exponent (-1 in this case).
+//! This factored out value is a ``CosmoQuantity`` which is built of a ``CosmoValue`` (containing the little h dependency) and its exponent (-1 in this case).
 //!
 //! ```
 //! use astroxide::units::*;
@@ -292,7 +294,7 @@ pub trait UnitLike {
     /// Conversion to a Unit which makes the thing "unitlike"
     fn as_unit(&self) -> Unit;
     /// Default implementation which calculates the conversion factor. For example if we have
-    /// km<sup>2</2> as a Unit (which trivially implements Unitlike) then the conversion factor for
+    /// km<sup>2</sup> as a Unit (which trivially implements Unitlike) then the conversion factor for
     /// the unit would be the conversion factor of the base unit(km) to the power of the exponent
     /// of the unit (2).
     fn calculate_conversion_factor(&self) -> f64 {
@@ -884,7 +886,7 @@ impl Display for CosmoValue {
 /// assert_eq!(cosmo_val_sugar, cosmo_val_sugar);
 /// ```
 /// This is especially nice when buidling [CosmoQuantity] objects which also contain a unit.
-/// The quantitiy 4 *h*<sup>-1<sup> Mpc can be represented in a nearly identical way.
+/// The quantitiy 4 *h*<sup>-1</sup> Mpc can be represented in a nearly identical way.
 /// ```
 /// use astroxide::units::*;
 ///
