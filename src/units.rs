@@ -483,6 +483,26 @@ impl Quantity {
             self.unit.clone(),
         )
     }
+    /// Converts the quantity to a different assumption of *h*.
+    ///
+    /// It is often necessary to convert quanities in one assumped cosmology into another. For
+    /// example, a distance of 1 Mpc assuming *h* = 0.7 and a scaling of *h<sup>-1</sup>* can be
+    /// converted into a cosmology where *h* = 0.67 by first factoring out the *h* dependency and
+    /// then factoring in a different assumption for *h*. This is often essential for comparing
+    /// identical physical properties that might vary in *h* scaling (Mass from luminosity vs mass
+    /// from velocity dispersion, for example).
+    ///
+    /// Switch cosmologies is a helper function which allows changing from_h to_h for a given h
+    /// dependency.
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let distance_70 = 1.*MEGAPARSEC;
+    /// let distance_60 = distance_70.switch_cosmologies(0.7, 0.6, -1);
+    /// let answer = 1.1667 * MEGAPARSEC;
+    /// assert!(distance_60.approx_eq(&answer, 2))
+    /// ```
     pub fn switch_cosmologies(&self, from_h: f64, to_h: f64, h_dependency: i32) -> Self {
         let with_h = self.factor_out_h(from_h, h_dependency);
         with_h.factor_in_h(to_h)
