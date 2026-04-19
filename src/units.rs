@@ -449,6 +449,8 @@ impl Quantity {
 
     /// Removes the assumed *h* dependency.
     ///
+    /// *Opposite of [CosmoQuantity::factor_in_h].*
+    ///
     /// Some quantities have been derived because of explicit assumptions of the cosmology that was
     /// used in the measurement of that quantity. For example, a Mass derived from Luminosity might
     /// well be determined to be 1.5e15 M<sub>☉</sub>. However, this quantitiy, wihthout an explicit
@@ -786,13 +788,35 @@ impl Sub for Quantity {
     }
 }
 
+/// Cosmological value that contains an explicit *h* scaling.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CosmoValue {
+    /// Floating value which is to be scaled by *h*.
     pub value: f64,
+    /// Explicit h scaling power. For example, 1 h<sup>-1</sup> will have a `h_dependency` of -1.
     pub h_dependency: i32,
 }
 
 impl CosmoValue {
+    /// Approximately equal method for a given decimal precision.
+    ///
+    /// Helper method for determining if two `CosmoValue` are approximately equal. Since units are
+    /// only using f64 floating point errors can occur. In addition there are some use cases where
+    /// absolute precision is not possible (comparison to other quantities in other works with
+    /// different significant figures for example.), Here decimal_place refers to up to what
+    /// decimal should be included in the comparison.
+    ///
+    /// *h* dependency is included in the comparison, so even if the values are within the tolerance,
+    /// non-equivalent h dependency will result in a "false".
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    /// let x = CosmoValue::new(5., -1);
+    /// let y = CosmoValue::new(5., -2);
+    /// let z = CosmoValue::new(5.0001, -1);
+    /// assert!(!x.approx_eq(&y, 9));
+    /// assert!(x.approx_eq(&z, 3));
+    /// ```
     pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
         ((self.value / other.value) - 1.).abs() < 0.1_f64.powi(decimal_place)
             && self.h_dependency == other.h_dependency
@@ -810,10 +834,25 @@ impl<T: UnitLike> Mul<T> for CosmoValue {
 }
 
 impl CosmoValue {
+    /// Constructs a new CosmoValue from the given value and h_dependency.
+    ///
+    /// # Examples
+    /// Creating the value 0.7 *h*<sup>-1</sup>. Can be done by:
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    /// let x = CosmoValue::new(0.7, -1);
+    /// ```
     pub fn new(value: f64, h_dependency: i32) -> Self {
         Self {
             value,
             h_dependency,
+        }
+    }
+    pub fn invert(&self) -> Self {
+        Self {
+            value: 1. / self.value,
+            h_dependency: -self.h_dependency,
         }
     }
 }
@@ -830,6 +869,30 @@ impl Display for CosmoValue {
     }
 }
 
+/// Struct representation of little h (*h*).
+///
+/// This is pure syntactic sugar for building [CosmoValue] objects and calls [CosmoValue::new] in
+/// the background.
+///
+/// # Examples
+/// Creating 0.7 *h*<sup>-1</sup>:
+/// ```
+/// use astroxide::units::*;
+///
+/// let cosmo_val_sugar = 0.7 * h(-1);
+/// let cosmo_val_normal =  CosmoValue::new(0.7, -1);
+/// assert_eq!(cosmo_val_sugar, cosmo_val_sugar);
+/// ```
+/// This is especially nice when buidling [CosmoQuantity] objects which also contain a unit.
+/// The quantitiy 4 *h*<sup>-1<sup> Mpc can be represented in a nearly identical way.
+/// ```
+/// use astroxide::units::*;
+///
+/// let cosmo_quantitiy = 4. *h(-1) * MEGAPARSEC;
+/// assert_eq!(cosmo_quantitiy.cosmo_value, 4. * h(-1));
+/// assert_eq!(cosmo_quantitiy.unit, MEGAPARSEC.as_unit());
+/// ```
+///
 #[allow(non_camel_case_types)]
 pub struct h(pub i32);
 
@@ -908,13 +971,37 @@ impl Div<CosmoValue> for h {
     }
 }
 
+#[allow(clippy::suspicious_arithmetic_impl)]
+impl<T: UnitLike> Div<T> for CosmoValue {
+    type Output = CosmoQuantity;
+    fn div(self, rhs: T) -> Self::Output {
+        self * rhs.as_unit().invert()
+    }
+}
+
+/// Equivalent to [Quantity] except with a [CosmoValue] instead of a primitive f64.
+///
+/// This type represents quantities that have a value (f64), a h scaling (i32) and a unit ([Unit]).
+/// For example, 1 *h*<sup>-1</sup> Mpc would be considered a [CosmoQuantity] where as 1 Mpc is
+/// just a [Quantity].
 #[derive(Debug, Clone, PartialEq)]
 pub struct CosmoQuantity {
+    /// The f64 value and its *h* scaling defined by a [CosmoValue].
     pub cosmo_value: CosmoValue,
+    /// The unit of the CosmoQuantity.
     pub unit: Unit,
 }
 
 impl CosmoQuantity {
+    /// Constructs a new CosmoQuantity from the given value, h_dependency, and unit.
+    ///
+    /// # Examples
+    /// Creating the value 0.7 *h*<sup>-1</sup> Mpc. Can be done by:
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    /// let x = CosmoQuantity::new(0.7, -1, MEGAPARSEC);
+    /// ```
     pub fn new(value: f64, h_dependency: i32, unit: impl UnitLike) -> Self {
         Self {
             cosmo_value: CosmoValue {
@@ -924,11 +1011,53 @@ impl CosmoQuantity {
             unit: unit.as_unit(),
         }
     }
+    /// Approximately equal method for a given decimal precision.
+    ///
+    /// Helper method for determining if two comso quantities are approximately equal. Since units are
+    /// only using f64 floating point errors can occur. In addition there are some use cases where
+    /// absolute precision is not possible (comparison to other quantities in other works with
+    /// different significant figures for example.), Here decimal_place refers to up to what
+    /// decimal should be included in the comparison.
+    ///
+    /// Units and h dependencies are included in the comparison, so even if the values are within the tolerance,
+    /// non-equal units and dependencies will result in a "false".
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let x = CosmoQuantity::new(0.7, -1, MEGAPARSEC);
+    /// let y = CosmoQuantity::new(0.7, -2, MEGAPARSEC);
+    /// let z = CosmoQuantity::new(0.7, -1, GIGAPARSEC);
+    ///
+    /// let a = CosmoQuantity::new(0.700001, -1, MEGAPARSEC);
+    ///
+    /// assert!(!x.approx_eq(&y, 9)); // different h scaling.
+    /// assert!(!x.approx_eq(&z, 9)); // different units.
+    ///
+    /// assert!(x.approx_eq(&a, 4));
+    /// ```
     pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
         self.cosmo_value
             .approx_eq(&other.cosmo_value, decimal_place)
             && self.unit == other.unit
     }
+    /// Makes an explicit asumption for *h*.
+    ///
+    /// *Opposite of [Quantity::factor_out_h].*
+    ///
+    /// This method is essential a way to convert from [CosmoQuantity] to a regular [Quantity] by
+    /// making an assumption for *h*. For example, 1 *h*<sup>-1</sup> Mpc has no asumption of *h*,
+    /// however, we could adopt a value of *h*=0.7, which would result in a quantity of 1 * (0.7)<sup>-1</sup> Mpc = 1.4285 Mpc.
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let value_h = 1. * h(-1) * MEGAPARSEC;
+    /// let value = value_h.factor_in_h(0.7);
+    /// let answer = 1.4285 * MEGAPARSEC;
+    /// assert!(value.approx_eq(&answer, 3));
+    ///
+    /// ```
     pub fn factor_in_h(&self, h_value: f64) -> Quantity {
         Quantity {
             unit: self.unit.clone(),
@@ -936,12 +1065,31 @@ impl CosmoQuantity {
         }
     }
 
-    pub fn ignore_h(&self) -> Quantity {
+    // Ignores that h scaling and just returns the value and the unit.
+    // Useful for doing the unit conversions but is not physical and so kept private to avoid
+    // confusion.
+    fn ignore_h(&self) -> Quantity {
         Quantity {
             unit: self.unit.clone(),
             value: self.cosmo_value.value,
         }
     }
+
+    /// Inverse of the CosmoQuantity.
+    ///
+    /// This is equivalent to return the CosmoQuantity to the power of -1.
+    /// For example, if we have the cosmo quantity 2 *h*<sup>-1</sup> Mpc then
+    /// the inverse would be 0.5 *h* Mpc<sup>-1</sup>.
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let x = 2. * h(-1) * MEGAPARSEC;
+    /// let x_inverse = x.invert();
+    /// let answer = 0.5 * h(1) /MEGAPARSEC ;
+    /// assert_eq!(x_inverse, answer);
+    /// ```
+    /// This is helpful for implementing divisions.
+    ///
     pub fn invert(&self) -> CosmoQuantity {
         CosmoQuantity {
             cosmo_value: CosmoValue {
@@ -951,6 +1099,23 @@ impl CosmoQuantity {
             unit: self.unit.clone().invert(),
         }
     }
+    /// Convert to equivalent unit (and h dependency).
+    ///
+    /// This is the [CosmoQuantity] equivalent of [Quantity::to].
+    ///
+    /// Just like a [Quantity], [CosmoQuantity] can be converted to an equivalent unit. For
+    /// example, 1000 *h*<sup>-1</sup> Mpc is equivalent to 1 *h*<sup>-1</sup> Gpc. The *h* scaling
+    /// carries and only the units and value are effected.
+    ///
+    /// ```
+    /// use astroxide::units::*;
+    ///
+    /// let distance_mpc = 1000. * h(-1) *MEGAPARSEC;
+    /// let distance_gpc = distance_mpc.to(GIGAPARSEC);
+    /// let answer = 1. * h(-1) * GIGAPARSEC;
+    ///
+    /// assert!(distance_gpc.approx_eq(&answer, 9));
+    /// ```
     pub fn to(&self, unit: impl UnitLike) -> CosmoQuantity {
         let converted = self.ignore_h().to(unit);
         CosmoQuantity::new(
@@ -1029,6 +1194,18 @@ impl Div for CosmoQuantity {
     }
 }
 
+/// Macro for creating [Dimension] object.
+///
+/// Equivalent to creating a Dimension struct but since all fields need a value (even if that value
+/// is 0) that quickly can become tedious.
+///
+/// ```
+/// use astroxide::units::*;
+/// let long_init = Dimension {length: 1, time: -1, ..Dimension::ZERO}:
+/// let easy = dim!(length: 1, time: 1);
+/// assert_eq(long_init, easy);
+///
+/// ```
 #[macro_export]
 macro_rules! dim {
     ($($field:ident: $value:expr),* $(,)?) => {
