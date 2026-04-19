@@ -1201,9 +1201,10 @@ impl Div for CosmoQuantity {
 ///
 /// ```
 /// use astroxide::units::*;
-/// let long_init = Dimension {length: 1, time: -1, ..Dimension::ZERO}:
-/// let easy = dim!(length: 1, time: 1);
-/// assert_eq(long_init, easy);
+/// use astroxide::dim;
+/// let long_init = Dimension {length: 1, time: -1, ..Dimension::ZERO};
+/// let easy = dim!(length: 1, time: -1);
+/// assert_eq!(long_init, easy);
 ///
 /// ```
 #[macro_export]
