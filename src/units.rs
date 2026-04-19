@@ -38,7 +38,7 @@
 //!
 //!
 //! What makes this units package novel is the handling of cosmological units. That is to say,
-//! taking into account the often dreaded ["Little h"](https://arxiv.org/pdf/1308.4150). astroxide
+//! taking into account the often dreaded [Little h](https://arxiv.org/pdf/1308.4150). astroxide
 //! units allow us to factor out little h from existing quantities, assume values for little h, or
 //! change cosmologies completely (In addition to all the standard conversions and dimension
 //! checking that come with standard units).  
@@ -75,7 +75,7 @@
 //! Of course we can just change little h assumpions completely. If we have a volume (h<sup>-3</sup> scaling) assuming
 //! H<sub>0</sub> = 70, and want to convert that to a cosmology assuming H<sub>0</sub> = 67, then
 //! one would usually factor out the h dependency then assume a different h (which we can do above)
-//! or simpley use the switch_cosmologies method on any quantity.
+//! or simpley use the ``Quantity::switch_cosmologies`` method on any quantity.
 //!
 //! ```
 //! use astroxide::units::*;
@@ -145,6 +145,7 @@ impl Dimension {
         amount_of_substance: 0,
     };
     /// New method which creates an empty dimension.
+    #[must_use]
     pub fn new() -> Self {
         Self::ZERO
     }
@@ -251,7 +252,7 @@ impl Eq for BaseUnit {}
 
 /// Unit represntation.
 ///
-/// Units are represented as a simple BTreeMap of Base Units and their exponents. This allows for
+/// Units are represented as a simple ``std::collections::BTreeMap`` of Base Units and their exponents. This allows for
 /// any arbitary unit to be manually defined from the base units that exist. For example, square
 /// meters are simply (meters: 2) whereas mpc would be defined as (mile: 1, hour: -1).
 ///
@@ -288,7 +289,7 @@ pub struct Quantity {
 /// Describes things that can act like units.
 ///
 /// Things that are directly convertable to units can use this trait. This is mainly used for
-/// BaseUnits to be treated as regular units. This also includes the calculation of the converson
+/// ``BaseUnits`` to be treated as regular units. This also includes the calculation of the converson
 /// factor for the thing implementing the trait.
 pub trait UnitLike {
     /// Conversion to a Unit which makes the thing "unitlike"
@@ -336,10 +337,11 @@ impl Unit {
     /// let dimensions = x.dimensions();
     /// assert_eq!(dimensions, dim!(length: 1, time: -1));
     /// ```
+    #[must_use]
     pub fn dimensions(&self) -> Dimension {
         let mut full_dimension = Dimension::new();
         for (base_unit, &exponent) in &self.base_units {
-            full_dimension = full_dimension + (base_unit.base_dimension * exponent)
+            full_dimension = full_dimension + (base_unit.base_dimension * exponent);
         }
         full_dimension
     }
@@ -356,6 +358,7 @@ impl Unit {
     /// ```
     /// This is helpful for implementing divisions.
     ///
+    #[must_use]
     pub fn invert(&self) -> Self {
         let mut inverted = BTreeMap::new();
         for (base_unit, exponent) in &self.base_units {
@@ -399,6 +402,7 @@ impl Quantity {
     /// let answer = 11.1847*(MILE/HOUR);
     /// assert!(speed_mph.approx_eq(&answer, 3));
     /// ```
+    /// # Panics
     /// `.to` will result in a panic if the units do not have the dame dimensionality.
     /// ```should_panic(expected = Cannot convert)
     /// use astroxide::units::*;
@@ -406,14 +410,14 @@ impl Quantity {
     /// let area = GIGAPARSEC*GIGAPARSEC;
     /// let conversion = speed.to(area); // non-physical conversion.
     /// ```
+    #[must_use]
     pub fn to(&self, target_unit: impl UnitLike) -> Self {
-        if self.unit.dimensions() != target_unit.as_unit().dimensions() {
-            panic!(
-                "Cannot convert {} to {} since they have different dimensions.",
-                self.unit,
-                target_unit.as_unit()
-            )
-        }
+        assert!(
+            self.unit.dimensions() == target_unit.as_unit().dimensions(),
+            "Cannot convert {} to {} since they have different dimensions.",
+            self.unit,
+            target_unit.as_unit()
+        );
 
         Quantity {
             unit: target_unit.as_unit(),
@@ -427,7 +431,7 @@ impl Quantity {
     /// Helper method for determining if two quantities are approximately equal. Since units are
     /// only using f64 floating point errors can occur. In addition there are some use cases where
     /// absolute precision is not possible (comparison to other quantities in other works with
-    /// different significant figures for example.), Here decimal_place refers to up to what
+    /// different significant figures for example.), Here `decimal_place` refers to up to what
     /// decimal should be included in the comparison.
     ///
     /// Units are included in the comparison, so even if the values are within the tolerance,
@@ -444,6 +448,7 @@ impl Quantity {
     /// let different_unit = 5. * KILOMETER;
     /// assert!(!unit.approx_eq(&different_unit, 3));
     /// ```
+    #[must_use]
     pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
         ((self.value / other.value) - 1.).abs() < 0.1_f64.powi(decimal_place)
             && self.unit == other.unit
@@ -451,7 +456,7 @@ impl Quantity {
 
     /// Removes the assumed *h* dependency.
     ///
-    /// *Opposite of [CosmoQuantity::factor_in_h].*
+    /// *Opposite of [`CosmoQuantity::factor_in_h`].*
     ///
     /// Some quantities have been derived because of explicit assumptions of the cosmology that was
     /// used in the measurement of that quantity. For example, a Mass derived from Luminosity might
@@ -480,6 +485,7 @@ impl Quantity {
     /// assert!(value_h.approx_eq(&answer, 9));
     ///
     /// ```
+    #[must_use]
     pub fn factor_out_h(&self, h_value: f64, h_dependency: i32) -> CosmoQuantity {
         CosmoQuantity::new(
             self.value / (h_value.powi(h_dependency)),
@@ -496,7 +502,7 @@ impl Quantity {
     /// identical physical properties that might vary in *h* scaling (Mass from luminosity vs mass
     /// from velocity dispersion, for example).
     ///
-    /// Switch cosmologies is a helper function which allows changing from_h to_h for a given h
+    /// Switch cosmologies is a helper function which allows changing `from_h` `to_h` for a given h
     /// dependency.
     ///
     /// ```
@@ -507,6 +513,7 @@ impl Quantity {
     /// let answer = 1.1667 * MEGAPARSEC;
     /// assert!(distance_60.approx_eq(&answer, 2))
     /// ```
+    #[must_use]
     pub fn switch_cosmologies(&self, from_h: f64, to_h: f64, h_dependency: i32) -> Self {
         let with_h = self.factor_out_h(from_h, h_dependency);
         with_h.factor_in_h(to_h)
@@ -560,7 +567,7 @@ impl Div<Quantity> for Quantity {
         let unit = self.unit / rhs.unit;
         let value = self.value / rhs.value;
 
-        Quantity { value, unit }
+        Quantity { unit, value }
     }
 }
 
@@ -668,7 +675,7 @@ impl Mul for Quantity {
     fn mul(self, rhs: Self) -> Self::Output {
         let unit = self.unit * rhs.unit;
         let value = self.value * rhs.value;
-        Quantity { value, unit }
+        Quantity { unit, value }
     }
 }
 
@@ -757,12 +764,12 @@ impl Mul<Quantity> for f64 {
 impl Add for Quantity {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        if self.unit.dimensions() != rhs.unit.dimensions() {
-            panic!(
-                "Cannot add or subtract {} and {} since they have different dimensions.",
-                self.unit, rhs.unit,
-            )
-        }
+        assert!(
+            self.unit.dimensions() == rhs.unit.dimensions(),
+            "Cannot add or subtract {} and {} since they have different dimensions.",
+            self.unit,
+            rhs.unit,
+        );
         let new_value = (self.value * self.unit.calculate_conversion_factor()
             + rhs.value * rhs.unit.calculate_conversion_factor())
             / self.unit.calculate_conversion_factor();
@@ -805,7 +812,7 @@ impl CosmoValue {
     /// Helper method for determining if two `CosmoValue` are approximately equal. Since units are
     /// only using f64 floating point errors can occur. In addition there are some use cases where
     /// absolute precision is not possible (comparison to other quantities in other works with
-    /// different significant figures for example.), Here decimal_place refers to up to what
+    /// different significant figures for example.), Here `decimal_place` refers to up to what
     /// decimal should be included in the comparison.
     ///
     /// *h* dependency is included in the comparison, so even if the values are within the tolerance,
@@ -819,6 +826,7 @@ impl CosmoValue {
     /// assert!(!x.approx_eq(&y, 9));
     /// assert!(x.approx_eq(&z, 3));
     /// ```
+    #[must_use]
     pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
         ((self.value / other.value) - 1.).abs() < 0.1_f64.powi(decimal_place)
             && self.h_dependency == other.h_dependency
@@ -836,7 +844,7 @@ impl<T: UnitLike> Mul<T> for CosmoValue {
 }
 
 impl CosmoValue {
-    /// Constructs a new CosmoValue from the given value and h_dependency.
+    /// Constructs a new `CosmoValue` from the given value and `h_dependency`.
     ///
     /// # Examples
     /// Creating the value 0.7 *h*<sup>-1</sup>. Can be done by:
@@ -845,16 +853,11 @@ impl CosmoValue {
     /// use astroxide::units::*;
     /// let x = CosmoValue::new(0.7, -1);
     /// ```
+    #[must_use]
     pub fn new(value: f64, h_dependency: i32) -> Self {
         Self {
             value,
             h_dependency,
-        }
-    }
-    pub fn invert(&self) -> Self {
-        Self {
-            value: 1. / self.value,
-            h_dependency: -self.h_dependency,
         }
     }
 }
@@ -873,7 +876,7 @@ impl Display for CosmoValue {
 
 /// Struct representation of little h (*h*).
 ///
-/// This is pure syntactic sugar for building [CosmoValue] objects and calls [CosmoValue::new] in
+/// This is pure syntactic sugar for building [`CosmoValue`] objects and calls [`CosmoValue::new`] in
 /// the background.
 ///
 /// # Examples
@@ -885,7 +888,7 @@ impl Display for CosmoValue {
 /// let cosmo_val_normal =  CosmoValue::new(0.7, -1);
 /// assert_eq!(cosmo_val_sugar, cosmo_val_sugar);
 /// ```
-/// This is especially nice when buidling [CosmoQuantity] objects which also contain a unit.
+/// This is especially nice when buidling [`CosmoQuantity`] objects which also contain a unit.
 /// The quantitiy 4 *h*<sup>-1</sup> Mpc can be represented in a nearly identical way.
 /// ```
 /// use astroxide::units::*;
@@ -981,21 +984,21 @@ impl<T: UnitLike> Div<T> for CosmoValue {
     }
 }
 
-/// Equivalent to [Quantity] except with a [CosmoValue] instead of a primitive f64.
+/// Equivalent to [`Quantity`] except with a [`CosmoValue`] instead of a primitive f64.
 ///
-/// This type represents quantities that have a value (f64), a h scaling (i32) and a unit ([Unit]).
-/// For example, 1 *h*<sup>-1</sup> Mpc would be considered a [CosmoQuantity] where as 1 Mpc is
-/// just a [Quantity].
+/// This type represents quantities that have a value (f64), a h scaling (i32) and a unit ([`Unit`]).
+/// For example, 1 *h*<sup>-1</sup> Mpc would be considered a [`CosmoQuantity`] where as 1 Mpc is
+/// just a [`Quantity`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct CosmoQuantity {
-    /// The f64 value and its *h* scaling defined by a [CosmoValue].
+    /// The f64 value and its *h* scaling defined by a [`CosmoValue`].
     pub cosmo_value: CosmoValue,
-    /// The unit of the CosmoQuantity.
+    /// The unit of the `CosmoQuantity`.
     pub unit: Unit,
 }
 
 impl CosmoQuantity {
-    /// Constructs a new CosmoQuantity from the given value, h_dependency, and unit.
+    /// Constructs a new `CosmoQuantity` from the given value, `h_dependency`, and unit.
     ///
     /// # Examples
     /// Creating the value 0.7 *h*<sup>-1</sup> Mpc. Can be done by:
@@ -1018,7 +1021,7 @@ impl CosmoQuantity {
     /// Helper method for determining if two comso quantities are approximately equal. Since units are
     /// only using f64 floating point errors can occur. In addition there are some use cases where
     /// absolute precision is not possible (comparison to other quantities in other works with
-    /// different significant figures for example.), Here decimal_place refers to up to what
+    /// different significant figures for example.), Here `decimal_place` refers to up to what
     /// decimal should be included in the comparison.
     ///
     /// Units and h dependencies are included in the comparison, so even if the values are within the tolerance,
@@ -1038,6 +1041,7 @@ impl CosmoQuantity {
     ///
     /// assert!(x.approx_eq(&a, 4));
     /// ```
+    #[must_use]
     pub fn approx_eq(&self, other: &Self, decimal_place: i32) -> bool {
         self.cosmo_value
             .approx_eq(&other.cosmo_value, decimal_place)
@@ -1045,9 +1049,9 @@ impl CosmoQuantity {
     }
     /// Makes an explicit asumption for *h*.
     ///
-    /// *Opposite of [Quantity::factor_out_h].*
+    /// *Opposite of [`Quantity::factor_out_h`].*
     ///
-    /// This method is essential a way to convert from [CosmoQuantity] to a regular [Quantity] by
+    /// This method is essential a way to convert from [`CosmoQuantity`] to a regular [`Quantity`] by
     /// making an assumption for *h*. For example, 1 *h*<sup>-1</sup> Mpc has no asumption of *h*,
     /// however, we could adopt a value of *h*=0.7, which would result in a quantity of 1 * (0.7)<sup>-1</sup> Mpc = 1.4285 Mpc.
     ///
@@ -1060,6 +1064,7 @@ impl CosmoQuantity {
     /// assert!(value.approx_eq(&answer, 3));
     ///
     /// ```
+    #[must_use]
     pub fn factor_in_h(&self, h_value: f64) -> Quantity {
         Quantity {
             unit: self.unit.clone(),
@@ -1077,9 +1082,9 @@ impl CosmoQuantity {
         }
     }
 
-    /// Inverse of the CosmoQuantity.
+    /// Inverse of the `CosmoQuantity`
     ///
-    /// This is equivalent to return the CosmoQuantity to the power of -1.
+    /// This is equivalent to return the `CosmoQuantity` to the power of -1.
     /// For example, if we have the cosmo quantity 2 *h*<sup>-1</sup> Mpc then
     /// the inverse would be 0.5 *h* Mpc<sup>-1</sup>.
     /// ```
@@ -1092,6 +1097,7 @@ impl CosmoQuantity {
     /// ```
     /// This is helpful for implementing divisions.
     ///
+    #[must_use]
     pub fn invert(&self) -> CosmoQuantity {
         CosmoQuantity {
             cosmo_value: CosmoValue {
@@ -1103,9 +1109,9 @@ impl CosmoQuantity {
     }
     /// Convert to equivalent unit (and h dependency).
     ///
-    /// This is the [CosmoQuantity] equivalent of [Quantity::to].
+    /// This is the [`CosmoQuantity`] equivalent of [`Quantity::to`].
     ///
-    /// Just like a [Quantity], [CosmoQuantity] can be converted to an equivalent unit. For
+    /// Just like a [`Quantity`], [`CosmoQuantity`] can be converted to an equivalent unit. For
     /// example, 1000 *h*<sup>-1</sup> Mpc is equivalent to 1 *h*<sup>-1</sup> Gpc. The *h* scaling
     /// carries and only the units and value are effected.
     ///
@@ -1118,6 +1124,7 @@ impl CosmoQuantity {
     ///
     /// assert!(distance_gpc.approx_eq(&answer, 9));
     /// ```
+    #[must_use]
     pub fn to(&self, unit: impl UnitLike) -> CosmoQuantity {
         let converted = self.ignore_h().to(unit);
         CosmoQuantity::new(
@@ -1150,12 +1157,10 @@ impl Neg for CosmoQuantity {
 impl Add for CosmoQuantity {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
-        if self.cosmo_value.h_dependency != rhs.cosmo_value.h_dependency {
-            panic!(
-                "Cannot add or subtract {} {} because of differing h dependencies.",
-                self, rhs
-            )
-        }
+        assert!(
+            self.cosmo_value.h_dependency == rhs.cosmo_value.h_dependency,
+            "Cannot add or subtract {self} {rhs} because of differing h dependencies."
+        );
         let quant = self.ignore_h() + rhs.ignore_h();
         CosmoQuantity {
             cosmo_value: CosmoValue {
@@ -1312,9 +1317,9 @@ si!(LIGHTYEAR, "lyr", 9.5e15, length);
 si!(PARSEC, "pc", 3.09e16, length);
 
 // Imperial Length Units
-length!(TWIP, "twip", 0.000017638888888);
-length!(THOU, "th", 0.0000254);
-length!(BARLEYCORN, "barleycorn", 0.008466666666);
+length!(TWIP, "twip", 0.000_017_638_888_888);
+length!(THOU, "th", 0.000_025_4);
+length!(BARLEYCORN, "barleycorn", 0.008_466_666_666);
 length!(INCH, "in", 0.0254);
 length!(HAND, "hh", 0.1016);
 length!(FOOT, "ft", 0.3048);
@@ -1326,14 +1331,14 @@ length!(LEAGUE, "lea", 4828.032);
 length!(FATHOM, "ftm", 1.8288);
 length!(CABLE, "cable", 185.2);
 length!(NAUTICAL_MILE, "nmi", 1852.);
-length!(LINK, "link", 0.201168);
+length!(LINK, "link", 0.201_168);
 length!(ROD, "rod", 5.0292);
 
 // Mass
 si!(GRAM, "g", 1., mass);
 
 // Astronomical Mass Units
-mass!(SOLAR_MASS, "M☉", 1.988475e33);
+mass!(SOLAR_MASS, "M☉", 1.988_475e33);
 
 // Time
 si!(SECOND, "s", 1., time);
@@ -1402,20 +1407,20 @@ mod tests {
     fn test_unit_factor() {
         let a = 5. * KILOMETER;
         let result = a.unit.calculate_conversion_factor();
-        assert_eq!(result, 1000.);
+        assert!((result - 1000.).abs() < f64::EPSILON);
     }
     #[test]
     fn test_unit_equality() {
         //test that order doens't matter and that unts are actually equal
-        let a = METER * METER;
-        let b = METER * KILOMETER;
-        let c = KILOMETER * KILOMETER;
-        let d = KILOMETER * KILOMETER;
-        let e = METER * METER;
-        assert_eq!(a, e);
-        assert_eq!(c, d);
-        assert_ne!(b, a);
-        assert_ne!(a, c);
+        let meter_squared = METER * METER;
+        let meter_kilometer = METER * KILOMETER;
+        let kilometer_squared = KILOMETER * KILOMETER;
+        let another_km_squared = KILOMETER * KILOMETER;
+        let another_meter_squared = METER * METER;
+        assert_eq!(meter_squared, another_meter_squared);
+        assert_eq!(kilometer_squared, another_km_squared);
+        assert_ne!(meter_kilometer, meter_squared);
+        assert_ne!(meter_squared, kilometer_squared);
 
         let a = METER * KILOMETER;
         let b = KILOMETER * METER;
@@ -1461,9 +1466,9 @@ mod tests {
         let meter_distance = distance_a.clone() + distance_b;
         let another_distance = distance_a + distance_c;
 
-        assert_eq!(meter_distance.value, 7.);
+        assert!((meter_distance.value - 7.).abs() < f64::EPSILON);
         assert_eq!(meter_distance.unit, METER.as_unit());
-        assert_eq!(another_distance.value, 3005.);
+        assert!((another_distance.value - 3005.).abs() < f64::EPSILON);
         assert_eq!(another_distance.unit, METER.as_unit());
     }
     #[test]
@@ -1471,7 +1476,7 @@ mod tests {
         let a = 5. * METER;
         let b = 0. * METER;
         let c = a + b;
-        assert_eq!(c.value, 5.);
+        assert!((c.value - 5.).abs() < f64::EPSILON);
         assert_eq!(c.unit, METER.as_unit());
     }
     #[test]
@@ -1482,7 +1487,7 @@ mod tests {
         let d = b.clone() - a.clone();
         assert!((c.value - 54015.).abs() < 1e-12);
         assert_eq!(c.unit, a.unit);
-        assert!((d.value - 14.99583333).abs() < 1e-7);
+        assert!((d.value - 14.995_833_33).abs() < 1e-7);
         assert_eq!(d.unit, b.unit);
     }
 
@@ -1494,9 +1499,9 @@ mod tests {
 
         let km_distance = meter_distance.to(KILOMETER);
         let distance = 5. * METER + 1. * KILOMETER;
-        assert_eq!(distance.value, 1005.);
-        assert_eq!(meter_distance.value, 7.);
-        assert_eq!(km_distance.value, 0.007);
+        assert!((distance.value - 1005.).abs() < f64::EPSILON);
+        assert!((meter_distance.value - 7.).abs() < f64::EPSILON);
+        assert!((km_distance.value - 0.007).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1522,8 +1527,8 @@ mod tests {
         let distance_c = CENTIMETER * 500.;
         let test_distance = distance_a - distance_b - distance_c;
         let test_distance_meters = test_distance.to(METER);
-        assert_eq!(test_distance.value, 4.495);
-        assert_eq!(test_distance_meters.value, 4495.);
+        assert!((test_distance.value - 4.495).abs() < f64::EPSILON);
+        assert!((test_distance_meters.value - 4495.).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1531,17 +1536,17 @@ mod tests {
         let unit = METER * SECOND * KILOMETER * METER;
         let answer = String::from("m² s km");
         let result = unit.to_string();
-        let mut answer_strings: Vec<&str> = answer.split(" ").collect();
-        let mut result_strings: Vec<&str> = result.split(" ").collect();
-        answer_strings.sort();
-        result_strings.sort();
-        assert_eq!(answer_strings, result_strings)
+        let mut answer_strings: Vec<&str> = answer.split(' ').collect();
+        let mut result_strings: Vec<&str> = result.split(' ').collect();
+        answer_strings.sort_unstable();
+        result_strings.sort_unstable();
+        assert_eq!(answer_strings, result_strings);
     }
 
     #[test]
     fn test_printing_quantities() {
         let quant = 5. * MEGAPARSEC / SECOND;
-        assert_eq!(quant.to_string(), "5 s⁻¹ Mpc")
+        assert_eq!(quant.to_string(), "5 s⁻¹ Mpc");
     }
 
     #[test]
@@ -1550,8 +1555,8 @@ mod tests {
         let y = 10. * SECOND;
         let velocity = x / y;
         let velocity_mh = velocity.to(METER / HOUR);
-        assert_eq!(velocity.value, 0.5);
-        assert_eq!(velocity_mh.value, 1800000.)
+        assert!((velocity.value - 0.5).abs() < f64::EPSILON);
+        assert!((velocity_mh.value - 1_800_000.).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1567,7 +1572,7 @@ mod tests {
 
         let hubble_constant = 70. * (KILOMETER / SECOND) / MEGAPARSEC;
         let weird_hubble = hubble_constant.to(METER / (KILOMETER * HOUR));
-        assert!((weird_hubble.value - 8.16676381e-12).abs() < 1e-12); // comparing to astropyj
+        assert!((weird_hubble.value - 8.166_763_81e-12).abs() < 1e-12); // comparing to astropyj
     }
     #[test]
     #[should_panic(expected = "Cannot convert")]
@@ -1580,24 +1585,24 @@ mod tests {
     fn testing_angular_conversions() {
         let a = 5. * RADIAN;
         let b = 2. * DEGREE;
-        assert_eq!(a.to(DEGREE).value, 286.4788975654116);
-        assert_eq!(a.to(ARCSECOND).value, 1031324.0312354818);
-        assert_eq!(a.to(ARCMINUTE).value, 17188.7338539247);
+        assert!((a.to(DEGREE).value - 286.478_897_565_411_6).abs() < f64::EPSILON);
+        assert!((a.to(ARCSECOND).value - 1_031_324.031_235_481_8).abs() < f64::EPSILON);
+        assert!((a.to(ARCMINUTE).value - 17_188.733_853_924_7).abs() < f64::EPSILON);
 
-        assert_eq!(b.to(RADIAN).value, 0.03490658503988659);
-        assert_eq!(b.to(ARCSECOND).value, 3600. * 2.);
-        assert_eq!(b.to(ARCMINUTE).value, 60. * 2.);
+        assert!((b.to(RADIAN).value - 0.034_906_585_039_886_59).abs() < f64::EPSILON);
+        assert!((b.to(ARCSECOND).value - 3600. * 2.).abs() < f64::EPSILON);
+        assert!((b.to(ARCMINUTE).value - 60. * 2.).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_derived_equivalence() {
         let a = 5. * HERTZ;
         let b = a.to((1. / HOUR).unit);
-        assert_eq!(b.value, 18000.);
+        assert!((b.value - 18000.).abs() < f64::EPSILON);
 
         let a = 2. * SOLAR_LUM;
         let b = a.to(WATT);
-        assert_eq!(b.value, 7.656e26);
+        assert!((b.value - 7.656e26).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -1605,7 +1610,7 @@ mod tests {
         let a = 1. * MEGAPARSEC;
         let b = a.factor_out_h(0.7, -1);
         let c = a.factor_out_h(0.7, -2);
-        assert_eq!(b.cosmo_value.value, 0.7);
+        assert!((b.cosmo_value.value - 0.7).abs() < f64::EPSILON);
         assert_eq!(b.unit, a.unit);
         assert!((c.cosmo_value.value - 0.49).abs() < f64::EPSILON);
     }
@@ -1615,7 +1620,7 @@ mod tests {
         let a = 1. * MEGAPARSEC;
         let b = a.factor_out_h(0.7, -1);
         let c = b.factor_in_h(0.7);
-        assert_eq!(c.value, a.value);
+        assert!((c.value - a.value).abs() < f64::EPSILON);
         assert_eq!(c.unit, a.unit);
     }
 
@@ -1639,12 +1644,12 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "Cannot add or subtract")]
     fn test_adding_wrong_h_dependencies() {
         let _ = CosmoQuantity::new(1., -1, METER) + CosmoQuantity::new(1., -2, METER);
     }
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "Cannot add or subtract")]
     fn test_subtracting_wrong_h_dependencies() {
         let _ = CosmoQuantity::new(1., -1, METER) - CosmoQuantity::new(1., -2, METER);
     }
@@ -1659,7 +1664,7 @@ mod tests {
         assert_eq!(mul_mul, answer);
 
         let mul_div = (a.clone() / b) / c;
-        let answer = CosmoQuantity::new(0.5291005291, 1, (1. / MEGAPARSEC).unit);
+        let answer = CosmoQuantity::new(0.529_100_529_1, 1, (1. / MEGAPARSEC).unit);
         assert!(mul_div.approx_eq(&answer, 9));
 
         let d = CosmoQuantity::new(2., -1, SECOND);
@@ -1672,7 +1677,7 @@ mod tests {
     fn test_converting_units() {
         let a = 1. * MEGAPARSEC;
         let b = a.switch_cosmologies(0.7, 0.6, -1);
-        let answer = 1.16666666667 * MEGAPARSEC;
+        let answer = 1.166_666_666_67 * MEGAPARSEC;
         assert!(b.approx_eq(&answer, 9));
     }
 
