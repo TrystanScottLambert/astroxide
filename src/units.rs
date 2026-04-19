@@ -331,7 +331,6 @@ impl Unit {
     ///
     /// ```
     /// use astroxide::units::*;
-    /// use astroxide::dim;
     ///
     /// let x = METER/SECOND;
     /// let dimensions = x.dimensions();
@@ -1208,7 +1207,6 @@ impl Div for CosmoQuantity {
 ///
 /// ```
 /// use astroxide::units::*;
-/// use astroxide::dim;
 /// let long_init = Dimension {length: 1, time: -1, ..Dimension::ZERO};
 /// let easy = dim!(length: 1, time: -1);
 /// assert_eq!(long_init, easy);
@@ -1223,6 +1221,7 @@ macro_rules! dim {
         }
     };
 }
+pub use dim;
 
 macro_rules! create_base_unit {
     ($name: ident, $symbol: expr, $dimension: expr, $conversion_factor: expr) => {
