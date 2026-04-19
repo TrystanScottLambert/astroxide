@@ -7,7 +7,7 @@
 //! requires more esoteric units (solar mass, Mpc) and other specialized unit functionality on top
 //! of general units. This crate aims to deliver a complete unit solution for astronomy.
 //!
-//! This package borrows from the [astropy.units](https://docs.astropy.org/en/stable/units/index.html) syntax so that users familar with it should already
+//! This package borrows from the [astropy.units](https://docs.astropy.org/en/stable/units/index.html) syntax so that users familiar with it should already
 //! feel comfortable with how the units are implemented here. The syntax is very similar to how
 //! units are actually written on paper.
 //!
@@ -72,10 +72,10 @@
 //! assert_eq!(mass_70.unit, SOLAR_MASS.as_unit());
 //! ```
 //!
-//! Of course we can just change little h assumpions completely. If we have a volume (h<sup>-3</sup> scaling) assuming
+//! Of course we can just change little h assumptions completely. If we have a volume (h<sup>-3</sup> scaling) assuming
 //! H<sub>0</sub> = 70, and want to convert that to a cosmology assuming H<sub>0</sub> = 67, then
 //! one would usually factor out the h dependency then assume a different h (which we can do above)
-//! or simpley use the ``Quantity::switch_cosmologies`` method on any quantity.
+//! or simply use the ``Quantity::switch_cosmologies`` method on any quantity.
 //!
 //! ```
 //! use astroxide::units::*;
@@ -99,7 +99,7 @@ use std::{
 
 /// The dimensional "finger print" which defines the dimensionality of a unit.
 ///
-/// This struct fully characterizes the dimensinality of unit which is essential for making sure
+/// This struct fully characterizes the dimensionality of unit which is essential for making sure
 /// that units of the same dimensionality can be added or subtracted or converted to one another.
 ///
 /// For example a speed of 5 km/hour and a speed of 10 miles/hour can be added togther and coverted
@@ -125,7 +125,7 @@ pub struct Dimension {
     pub angular_distance: i32,
     /// scaling of "solid angle" dimension.
     pub solid_angle: i32,
-    /// scaling of "Luminsou Intensity" dimension.
+    /// scaling of "Luminous Intensity" dimension.
     pub luminous_intensity: i32,
     /// scaling of "amount of substance" dimension.
     pub amount_of_substance: i32,
@@ -224,7 +224,7 @@ impl Sub for Dimension {
 pub struct BaseUnit {
     /// Dimensional finger print of unit.
     pub base_dimension: Dimension,
-    /// The symbol represntation of the unit e.g., "km", "s", "Mpc".
+    /// The symbol representation of the unit e.g., "km", "s", "Mpc".
     pub symbol: &'static str,
     /// The conversion factor to some arbitary common value for that dimensionality. Usually the SI standard.
     pub conversion_factor: f64,
@@ -277,7 +277,7 @@ pub struct Unit {
 /// Main data structure for representing values and their associated units.
 ///
 /// Quantity combines f64 values and their units into one struct. This is the main way that a user
-/// would interact with data. The 'quantity' 5 km is distinct from the specific value '5' and the abtract unit 'km'.
+/// would interact with data. The 'quantity' 5 km is distinct from the specific value '5' and the abstract unit 'km'.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Quantity {
     /// The unit of the quantity represented as [Unit] struct. ('km/s' in the quantity 5 km/s).
@@ -460,7 +460,7 @@ impl Quantity {
     ///
     /// Some quantities have been derived because of explicit assumptions of the cosmology that was
     /// used in the measurement of that quantity. For example, a Mass derived from Luminosity might
-    /// well be determined to be 1.5e15 M<sub>☉</sub>. However, this quantitiy, wihthout an explicit
+    /// well be determined to be 1.5e15 M<sub>☉</sub>. However, this quantity, without an explicit
     /// *h* scaling, usually means: 1. a *h*<sup>-2</sup> dependency and 2. a specific choice of *h*.
     ///
     /// In this example, if we knew that the assumed value of *h* was 0.7, then we could "factor
@@ -478,7 +478,7 @@ impl Quantity {
     /// let answer = 7.35e14 * h(-2) * SOLAR_MASS;
     /// assert!(mass_h_independent.approx_eq(&answer,2));
     ///
-    /// // exmaples from https://www.astro.ljmu.ac.uk/~ikb/research/h-units.html
+    /// // examples from https://www.astro.ljmu.ac.uk/~ikb/research/h-units.html
     /// let value = 1. * MEGAPARSEC;
     /// let value_h = value.factor_out_h(0.7, -1);
     /// let answer = 0.7 * h(-1) * MEGAPARSEC;
