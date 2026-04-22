@@ -1245,6 +1245,7 @@ macro_rules! unit_generator {
     };
 }
 unit_generator!(length, dim!(length: 1));
+unit_generator!(volume, dim!(length: 3));
 unit_generator!(mass, dim!(mass: 1));
 unit_generator!(time, dim!(time: 1));
 unit_generator!(temperature, dim!(temperature: 1));
@@ -1376,6 +1377,7 @@ si!(CANDELA, "cd", 1., luminous_intensity);
 si!(MOL, "mol", 1., amount_of_substance);
 
 // Derived Units
+si!(LITRE, "l", 1., volume);
 si!(HERTZ, "Hz", 1., frequency);
 si!(NEWTON, "N", 1., force);
 si!(PASCAL, "Pa", 1., pressure);
