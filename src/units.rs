@@ -322,6 +322,36 @@ impl Display for Unit {
     }
 }
 
+/// Adds methods to convert values into common Quantities
+pub trait QuantityConversions {
+    /// Convert value into meters
+    fn meter(self) -> Quantity;
+}
+
+impl QuantityConversions for f64 {
+    fn meter(self) -> Quantity {
+        self * METER
+    }
+}
+
+impl QuantityConversions for f32 {
+    fn meter(self) -> Quantity {
+        (self as f64) * METER
+    }
+}
+
+impl QuantityConversions for i32 {
+    fn meter(self) -> Quantity {
+        (self as f64) * METER
+    }
+}
+
+impl QuantityConversions for u32 {
+    fn meter(self) -> Quantity {
+        (self as f64) * METER
+    }
+}
+
 impl Unit {
     /// The dimensionality of the given unit.
     ///
@@ -1712,5 +1742,15 @@ mod tests {
         println!("Mass assuming h=0.7: {mass}");
         println!("Mass with h factored out: {h_mass}");
         println!("Mass assuming h=0.67: {mass_067}");
+    }
+
+    #[test]
+    fn test_quantity_conversions() {
+        // What we want users to be able to do
+        assert_eq!(5.meter(), 5. * METER);
+        // works with other types as well, in case it's necessary
+        assert_eq!(5i32.meter(), 5. * METER);
+        assert_eq!(5u32.meter(), 5. * METER);
+        assert_eq!(5f32.meter(), 5. * METER);
     }
 }
